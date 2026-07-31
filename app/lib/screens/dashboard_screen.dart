@@ -28,9 +28,10 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late final DateTime _today = widget.today ?? DateTime.now();
   Map<FarmRole, List<ChoreInstance>> _byRole = {};
+  Map<String, String> _names = {};
   bool _loading = true;
   bool _hasDefaults = false;
-  bool _gridMode = false;
+  bool _gridMode = true;
 
   @override
   void initState() {
@@ -43,15 +44,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
         (await widget.repository.loadBaseRoleDefaultSets()).isNotEmpty;
     await widget.repository.ensureDayGenerated(_today);
     final instances = await widget.repository.loadInstancesForDate(_today);
+    final names = await widget.repository.loadMemberNames();
     if (!mounted) return;
     setState(() {
       _hasDefaults = hasDefaults;
+      _names = names;
       _byRole = {
         for (final role in FarmRoles.all)
-          role: instances.where((i) => i.role == role).toList(),
+          role: _workOrder(instances.where((i) => i.role == role).toList()),
       };
       _loading = false;
     });
+  }
+
+  /// Remaining work first, done items last; stable within each group.
+  static List<ChoreInstance> _workOrder(List<ChoreInstance> instances) {
+    final remaining = instances.where((i) => i.status.isRemaining).toList()
+      ..sort((a, b) => a.slug.compareTo(b.slug));
+    final done = instances.where((i) => !i.status.isRemaining).toList()
+      ..sort((a, b) => a.slug.compareTo(b.slug));
+    return [...remaining, ...done];
+  }
+
+  Future<void> _editName() async {
+    final controller = TextEditingController(
+      text: _names[widget.repository.myPubkey] ?? '',
+    );
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Your name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'First name',
+            hintText: 'Shown to the farm on assignments',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty || !mounted) return;
+    await widget.repository.saveMyName(name);
+    await _refresh();
   }
 
   Future<void> _loadDemoData() async {
@@ -79,6 +124,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: Icon(_gridMode ? Icons.view_list : Icons.grid_view),
             tooltip: _gridMode ? 'Show list' : 'Show grid',
             onPressed: () => setState(() => _gridMode = !_gridMode),
+          ),
+          IconButton(
+            icon: const Icon(Icons.badge_outlined),
+            tooltip: 'Your name',
+            onPressed: _editName,
           ),
         ],
       ),
@@ -130,6 +180,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: ChoreCard(
                   instance: instance,
+                  memberNames: _names,
                   onTap: () => showStatusActions(
                     context: context,
                     repository: widget.repository,
@@ -163,11 +214,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 8,
             crossAxisSpacing: 8,
-            mainAxisExtent: 76,
+            mainAxisExtent: 96,
             children: [
               for (final instance in _byRole[role]!)
                 ChoreCard(
                   instance: instance,
+                  memberNames: _names,
                   onTap: () => showStatusActions(
                     context: context,
                     repository: widget.repository,

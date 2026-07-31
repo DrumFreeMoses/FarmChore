@@ -4,9 +4,10 @@ import 'package:farm_chore/data/chore_repository.dart';
 import 'dashboard_screen.dart';
 import 'history_screen.dart';
 import 'my_chores_screen.dart';
+import 'news_screen.dart';
 import 'undone_chores_screen.dart';
 
-/// App shell: bottom navigation over the four farm views.
+/// App shell: bottom navigation over the five farm views.
 class HomeShell extends StatefulWidget {
   const HomeShell({
     super.key,
@@ -37,6 +38,7 @@ class _HomeShellState extends State<HomeShell> {
       ),
       UndoneChoresScreen(repository: widget.repository, today: widget.today),
       HistoryScreen(repository: widget.repository, today: widget.today),
+      NewsScreen(repository: widget.repository),
     ];
     return Scaffold(
       body: IndexedStack(index: _index, children: screens),
@@ -51,6 +53,7 @@ class _HomeShellState extends State<HomeShell> {
             label: 'Remaining',
           ),
           NavigationDestination(icon: Icon(Icons.history), label: 'History'),
+          NavigationDestination(icon: Icon(Icons.campaign), label: 'News'),
         ],
       ),
     );

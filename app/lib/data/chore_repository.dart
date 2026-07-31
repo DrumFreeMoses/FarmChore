@@ -8,6 +8,8 @@ import '../domain/assignment.dart';
 import '../domain/chore_instance.dart';
 import '../domain/daily_generator.dart';
 import '../domain/edit_event.dart';
+import '../domain/heads_up.dart';
+import '../domain/member_profile.dart';
 import '../domain/role_default_set.dart';
 import '../domain/roles.dart';
 import '../nostr/nostr_event.dart';
@@ -150,6 +152,70 @@ class ChoreRepository {
     final known = members.toList()..sort();
     known.remove(myPubkey);
     return [myPubkey, ...known];
+  }
+
+  /// Stores my display name (kind 31504, addressable by my pubkey).
+  Future<void> saveMyName(String name) async {
+    await _persist(
+      MemberProfile(pubkey: myPubkey, name: name).toNostrEvent(
+        pubKey: myPubkey,
+        createdAt: _now(),
+        farmPubkey: farmPubkey,
+      ),
+    );
+  }
+
+  /// Known display names keyed by pubkey (latest profile per member wins).
+  Future<Map<String, String>> loadMemberNames() async {
+    final rows = await database.eventsForKind(memberProfileKind).get();
+    final latest = <String, Event>{};
+    for (final row in rows) {
+      final profile = MemberProfile.fromNostrEvent(_toNostr(row));
+      final current = latest[profile.pubkey];
+      if (current == null || row.createdAt > current.createdAt) {
+        latest[profile.pubkey] = row;
+      }
+    }
+    return {
+      for (final row in latest.values)
+        MemberProfile.fromNostrEvent(_toNostr(row)).pubkey:
+            MemberProfile.fromNostrEvent(_toNostr(row)).name,
+    };
+  }
+
+  /// Posts a heads-up notice for the farm or one role group (kind 31505).
+  Future<void> saveHeadsUp(String text, {FarmRole? scope}) async {
+    final now = _now();
+    await _persist(
+      HeadsUp(
+        text: text,
+        author: myPubkey,
+        createdAt: now,
+        scope: scope,
+      ).toNostrEvent(pubKey: myPubkey, createdAt: now, farmPubkey: farmPubkey),
+    );
+  }
+
+  /// All heads-ups, newest first. Only the latest event per author+time
+  /// pair is kept (addressable events).
+  Future<List<HeadsUp>> loadHeadsUps() async {
+    final rows = await database.eventsForKind(headsUpKind).get();
+    final latest = <String, Event>{};
+    for (final row in rows) {
+      final key = _dTag(row) ?? row.id;
+      final current = latest[key];
+      if (current == null ||
+          row.createdAt > current.createdAt ||
+          (row.createdAt == current.createdAt &&
+              row.id.compareTo(current.id) > 0)) {
+        latest[key] = row;
+      }
+    }
+    final headsUps = latest.values.map(
+      (r) => HeadsUp.fromNostrEvent(_toNostr(r)),
+    );
+    return headsUps.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   /// Instances for [date], newest event first (LWW by createdAt per d tag).

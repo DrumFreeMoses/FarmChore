@@ -13,13 +13,28 @@ class ChoreCard extends StatelessWidget {
     required this.instance,
     this.onTap,
     this.trailing,
+    this.memberNames,
   });
 
   final ChoreInstance instance;
   final VoidCallback? onTap;
   final Widget? trailing;
 
+  /// Display names by pubkey; assignees fall back to a short hex.
+  final Map<String, String>? memberNames;
+
   bool get _isChore => instance.type == ChoreType.chore;
+
+  String? get _assigneeLabel {
+    final assignee = instance.assignee;
+    if (assignee == null) return null;
+    return memberNames?[assignee] ?? _shortHex(assignee);
+  }
+
+  String _shortHex(String pubkey) {
+    if (pubkey.length <= 14) return pubkey;
+    return '${pubkey.substring(0, 8)}…${pubkey.substring(pubkey.length - 6)}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,14 +64,16 @@ class ChoreCard extends StatelessWidget {
                   children: [
                     Text(
                       instance.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: textTheme.titleMedium?.copyWith(
                         color: FarmColors.soilBrown,
                         decoration: done ? TextDecoration.lineThrough : null,
                       ),
                     ),
-                    if (instance.assignee case final assignee?)
+                    if (instance.assignee != null)
                       Text(
-                        'Assigned: $assignee',
+                        'Assigned: $_assigneeLabel',
                         style: textTheme.bodySmall?.copyWith(
                           color: FarmColors.soilBrown.withValues(alpha: 0.7),
                         ),

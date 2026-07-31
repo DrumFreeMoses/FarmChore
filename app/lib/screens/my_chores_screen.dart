@@ -26,6 +26,7 @@ class MyChoresScreen extends StatefulWidget {
 class _MyChoresScreenState extends State<MyChoresScreen> {
   late final DateTime _today = widget.today ?? DateTime.now();
   List<ChoreInstance> _mine = [];
+  Map<String, String> _names = {};
   bool _loading = true;
 
   @override
@@ -36,8 +37,10 @@ class _MyChoresScreenState extends State<MyChoresScreen> {
 
   Future<void> _refresh() async {
     final instances = await widget.repository.loadInstancesForDate(_today);
+    final names = await widget.repository.loadMemberNames();
     if (!mounted) return;
     setState(() {
+      _names = names;
       _mine = instances
           .where((i) => i.assignee == widget.myPubkey)
           .where((i) => i.status.isRemaining)
@@ -83,6 +86,7 @@ class _MyChoresScreenState extends State<MyChoresScreen> {
                         final instance = _mine[index];
                         return ChoreCard(
                           instance: instance,
+                          memberNames: _names,
                           onTap: () => showStatusActions(
                             context: context,
                             repository: widget.repository,

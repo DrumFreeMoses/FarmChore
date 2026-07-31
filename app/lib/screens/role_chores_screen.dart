@@ -29,6 +29,7 @@ class RoleChoresScreen extends StatefulWidget {
 class _RoleChoresScreenState extends State<RoleChoresScreen> {
   late final DateTime _today = widget.today ?? DateTime.now();
   List<ChoreInstance> _instances = [];
+  Map<String, String> _names = {};
   bool _loading = true;
 
   @override
@@ -39,8 +40,10 @@ class _RoleChoresScreenState extends State<RoleChoresScreen> {
 
   Future<void> _refresh() async {
     final all = await widget.repository.loadInstancesForDate(_today);
+    final names = await widget.repository.loadMemberNames();
     if (!mounted) return;
     setState(() {
+      _names = names;
       _instances = all.where((i) => i.role == widget.role).toList();
       _loading = false;
     });
@@ -103,6 +106,7 @@ class _RoleChoresScreenState extends State<RoleChoresScreen> {
                         final instance = _instances[index];
                         return ChoreCard(
                           instance: instance,
+                          memberNames: _names,
                           onTap: () => showStatusActions(
                             context: context,
                             repository: widget.repository,

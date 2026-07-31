@@ -23,6 +23,7 @@ class UndoneChoresScreen extends StatefulWidget {
 class _UndoneChoresScreenState extends State<UndoneChoresScreen> {
   late final DateTime _today = widget.today ?? DateTime.now();
   Map<FarmRole, List<ChoreInstance>> _byRole = {};
+  Map<String, String> _names = {};
   bool _loading = true;
 
   @override
@@ -33,8 +34,10 @@ class _UndoneChoresScreenState extends State<UndoneChoresScreen> {
 
   Future<void> _refresh() async {
     final instances = await widget.repository.loadInstancesForDate(_today);
+    final names = await widget.repository.loadMemberNames();
     if (!mounted) return;
     setState(() {
+      _names = names;
       _byRole = <FarmRole, List<ChoreInstance>>{};
       for (final instance in instances) {
         if (!instance.status.isRemaining) continue;
@@ -94,6 +97,7 @@ class _UndoneChoresScreenState extends State<UndoneChoresScreen> {
                             for (final instance in instances)
                               ChoreCard(
                                 instance: instance,
+                                memberNames: _names,
                                 onTap: () => showStatusActions(
                                   context: context,
                                   repository: widget.repository,

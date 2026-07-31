@@ -27,6 +27,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   );
   List<ChoreInstance> _all = [];
   List<ChoreInstance> _filtered = [];
+  Map<String, String> _names = {};
   FarmRole? _roleFilter;
   String? _assigneeFilter;
   String _titleQuery = '';
@@ -40,8 +41,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _load() async {
     _all = await widget.repository.loadInstancesBetween(_from, _today);
+    final names = await widget.repository.loadMemberNames();
     if (!mounted) return;
     setState(() {
+      _names = names;
       _applyFilters();
       _loading = false;
     });
@@ -127,7 +130,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       ?.copyWith(color: FarmColors.sabbath),
                                 ),
                               ),
-                            ChoreCard(instance: instance),
+                            ChoreCard(instance: instance, memberNames: _names),
                           ],
                         );
                       },

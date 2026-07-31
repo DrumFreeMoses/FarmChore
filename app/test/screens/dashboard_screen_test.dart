@@ -62,6 +62,8 @@ void main() {
     final repo = await seedRepository(today: friday);
     addTearDown(repo.database.close);
     await pumpDashboard(tester, repo);
+    await tester.tap(find.byTooltip('Show list'));
+    await tester.pumpAndSettle();
 
     expect(find.text("Milker's Chores"), findsOneWidget);
     expect(find.text("Feeder's Chores"), findsOneWidget);
@@ -85,28 +87,65 @@ void main() {
     expect(find.text('Evening milking'), findsOneWidget);
   });
 
-  testWidgets('dashboard toggles between list and two-column grid', (
+  testWidgets('dashboard defaults to grid, toggles to list and back', (
     tester,
   ) async {
     final repo = await seedRepository(today: friday);
     addTearDown(repo.database.close);
     await pumpDashboard(tester, repo);
 
-    expect(find.text('Morning milking'), findsOneWidget); // list mode
-
-    await tester.tap(find.byTooltip('Show grid'));
-    await tester.pumpAndSettle();
-
-    // Grid still lists every chore, two-up under each role header.
+    // Grid is the default view and lists every chore two-up.
+    expect(find.byTooltip('Show list'), findsOneWidget);
     expect(find.text('Morning milking'), findsOneWidget);
     expect(find.text('Clean stalls'), findsOneWidget);
     expect(find.text('3 open'), findsOneWidget);
-    expect(find.byTooltip('Show list'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Show list'));
     await tester.pumpAndSettle();
 
+    expect(find.byTooltip('Show grid'), findsOneWidget);
     expect(find.text('Morning milking'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Show grid'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Morning milking'), findsOneWidget);
+  });
+
+  testWidgets('done chores are listed last within their role', (tester) async {
+    final repo = await seedRepository(today: friday);
+    addTearDown(repo.database.close);
+    final milking = (await repo.loadInstancesForDate(
+      friday,
+    )).firstWhere((i) => i.title == 'Clean stalls');
+    await repo.editStatus(milking, ChoreStatus.done);
+    await pumpDashboard(tester, repo);
+
+    final cleanY = tester.getTopLeft(find.text('Clean stalls')).dy;
+    final morningY = tester.getTopLeft(find.text('Morning milking')).dy;
+    final eveningY = tester.getTopLeft(find.text('Evening milking')).dy;
+    expect(cleanY, greaterThan(morningY));
+    expect(cleanY, greaterThan(eveningY));
+  });
+
+  testWidgets('saving your name shows it on assignments', (tester) async {
+    final repo = await seedRepository(today: friday);
+    addTearDown(repo.database.close);
+    final instance = (await repo.loadInstancesForDate(friday)).first;
+    await repo.assign(instance, repo.myPubkey);
+    await pumpDashboard(tester, repo);
+
+    await tester.tap(find.byTooltip('Your name'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'First name'),
+      'Moses',
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Assigned: Moses'), findsOneWidget);
+    expect(await repo.loadMemberNames(), {repo.myPubkey: 'Moses'});
   });
 
   testWidgets('adding a one-time task shows it on today\'s dashboard', (

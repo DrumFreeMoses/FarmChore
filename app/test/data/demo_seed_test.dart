@@ -98,6 +98,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // List mode shows the per-role empty state; grid mode shows headers.
+    await tester.tap(find.byTooltip('Show list'));
+    await tester.pumpAndSettle();
     expect(find.byTooltip('Load demo data'), findsOneWidget);
     expect(find.text('No chores today'), findsNWidgets(6));
 

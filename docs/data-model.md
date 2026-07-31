@@ -8,10 +8,12 @@ matches the farm.
 
 | Kind | Name | Semantics |
 |------|------|-----------|
-| `31500` | Role default set | Per-role daily chore defaults (addressable by role) |
+| `31500` | Role default set | Per-role daily chore defaults (addressable by role or `role:variant`) |
 | `31501` | Chore/Task instance | A scheduled item for a date |
 | `31502` | Assignment | Assign/self-assign an instance to a member |
 | `31503` | Edit | Revision of an instance or default (one-time vs default) |
+| `31504` | Member profile | A member's display name (addressable by pubkey) |
+| `31505` | Heads-up | Farm notice for the whole farm or one role group |
 
 Kinds are in the addressable range (30000-39999), so relays keep only the
 latest event per `(kind, pubkey, d-tag)`.
