@@ -83,9 +83,14 @@ def fetch_label_ids():
 def cmd_ids():
     data = graphql(
         """query($id: ID!) {
-          node(id: $id) { ... on ProjectV2 { title fields(first: 20) {
-            nodes { __typename ... on ProjectV2SingleSelectField {
-              name id options { name id } } } } } }""",
+  node(id: $id) { ... on ProjectV2 {
+    title
+    fields(first: 20) { nodes {
+      __typename
+      ... on ProjectV2SingleSelectField { name id options { name id } }
+    } }
+  } }
+}""",
         id=PROJECT_ID,
     )
     node = data["node"]
