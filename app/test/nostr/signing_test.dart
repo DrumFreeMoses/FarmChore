@@ -38,9 +38,11 @@ void main() {
       final tamperedContent = event.copyWith(content: 'tampered');
       expect(tamperedContent.verifySignature(), isFalse);
 
-      final tamperedTags = event.copyWith(tags: [
-        ['role', 'Feeders'],
-      ]);
+      final tamperedTags = event.copyWith(
+        tags: [
+          ['role', 'Feeders'],
+        ],
+      );
       expect(tamperedTags.verifySignature(), isFalse);
     });
 
