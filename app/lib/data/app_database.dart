@@ -40,6 +40,10 @@ class AppDatabase extends _$AppDatabase {
       (select(events)..where((e) => e.kind.equals(kind)))
         ..orderBy([(e) => OrderingTerm.asc(e.createdAt)]);
 
+  /// The whole local event log, oldest first.
+  Selectable<Event> allEvents() =>
+      select(events)..orderBy([(e) => OrderingTerm.asc(e.createdAt)]);
+
   /// Locally-queued events awaiting relay acknowledgement.
   Selectable<Event> pendingEvents() =>
       select(events)..where((e) => e.sent.equals(false));

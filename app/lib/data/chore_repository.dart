@@ -27,6 +27,9 @@ class ChoreRepository {
   /// Pubkey anchoring the farm namespace; attached to every signed event.
   final String? farmPubkey;
 
+  /// This device's member pubkey (signs all writes).
+  String get myPubkey => keys.public;
+
   int _lastCreatedAt = 0;
 
   /// Monotonic created-at (seconds): guarantees strict LWW ordering even for
@@ -107,6 +110,46 @@ class ChoreRepository {
     await saveRoleDefaultSet(
       RoleDefaultSet(role: set.role, chores: set.chores),
     );
+  }
+
+  /// Appends [title] (every workday) to [role]'s active default set.
+  Future<void> addDefaultChore(FarmRole role, String title) async {
+    final sets = await loadBaseRoleDefaultSets();
+    final set = sets.where((s) => s.role == role).firstOrNull;
+    await saveRoleDefaultSet(
+      RoleDefaultSet(
+        role: role,
+        chores: [
+          ...?set?.chores,
+          ChoreDefault(title: title, weekdays: const [1, 2, 3, 4, 5, 6]),
+        ],
+      ),
+    );
+  }
+
+  /// Members known to the farm: me first, then everyone who signed or was
+  /// assigned an instance, in pubkey order.
+  Future<List<String>> loadKnownMembers() async {
+    final rows = await database.allEvents().get();
+    final members = <String>{};
+    for (final row in rows) {
+      if (row.kind == choreInstanceKind || row.kind == assignmentKind) {
+        members.add(row.pubkey);
+      }
+      final tags = jsonDecode(row.tags) as List;
+      for (final tag in tags) {
+        if (tag is List &&
+            tag.isNotEmpty &&
+            tag.first == 'assignee' &&
+            tag.length > 1 &&
+            tag[1].isNotEmpty) {
+          members.add(tag[1] as String);
+        }
+      }
+    }
+    final known = members.toList()..sort();
+    known.remove(myPubkey);
+    return [myPubkey, ...known];
   }
 
   /// Instances for [date], newest event first (LWW by createdAt per d tag).
@@ -193,8 +236,13 @@ class ChoreRepository {
   }
 
   /// Assigns (or re-assigns) [instance] to [assigneePubkey]. Self-assignment
-  /// is just an assignment whose signer is the assignee.
+  /// is just an assignment whose signer is the assignee. An empty pubkey
+  /// unassigns the instance.
   Future<void> assign(ChoreInstance instance, String assigneePubkey) async {
+    if (assigneePubkey.isEmpty) {
+      await saveInstance(instance.copyWith(assignee: null));
+      return;
+    }
     final assigned = instance.copyWith(assignee: assigneePubkey);
     await saveInstance(assigned);
     final event =

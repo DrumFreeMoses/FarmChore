@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:farm_chore/domain/roles.dart';
 
 /// FarmChore design tokens: dawn on the cottonwood row.
 /// See docs/design.md for the story behind each color.
@@ -11,6 +12,17 @@ abstract final class FarmColors {
   static const hayYellow = Color(0xFFF2D58C);
   static const sabbath = Color(0xFF8C9A8A);
 }
+
+/// One accent per role, used on role headers everywhere so the same
+/// role always reads the same color.
+Color roleAccent(FarmRole role) => switch (role) {
+  FarmRole.milkers => FarmColors.dawnAmber,
+  FarmRole.pourers => FarmColors.springBlue,
+  FarmRole.feeders => FarmColors.cottonwoodGreen,
+  FarmRole.mechanics => FarmColors.soilBrown,
+  FarmRole.farmers => FarmColors.hayYellow,
+  FarmRole.nonJsf => FarmColors.sabbath,
+};
 
 /// The farm's dawn theme: cream backgrounds, soil text, amber chore accents.
 ThemeData farmTheme() {

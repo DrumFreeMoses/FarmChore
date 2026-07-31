@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
+import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:farm_chore/widgets/chore_card.dart';
+import 'package:farm_chore/widgets/new_item_dialog.dart';
+import 'package:farm_chore/widgets/role_section_header.dart';
 import 'package:farm_chore/widgets/status_actions_sheet.dart';
 
 /// Today's remaining work, grouped by role with counts: the farm-wide
-/// morning-meeting overview.
+/// morning-meeting overview. Roles always appear in canonical order.
 class UndoneChoresScreen extends StatefulWidget {
   const UndoneChoresScreen({super.key, required this.repository, this.today});
 
@@ -19,7 +22,7 @@ class UndoneChoresScreen extends StatefulWidget {
 
 class _UndoneChoresScreenState extends State<UndoneChoresScreen> {
   late final DateTime _today = widget.today ?? DateTime.now();
-  Map<String, List<ChoreInstance>> _byRole = {};
+  Map<FarmRole, List<ChoreInstance>> _byRole = {};
   bool _loading = true;
 
   @override
@@ -32,25 +35,38 @@ class _UndoneChoresScreenState extends State<UndoneChoresScreen> {
     final instances = await widget.repository.loadInstancesForDate(_today);
     if (!mounted) return;
     setState(() {
-      final undone = instances.where((i) => i.status.isRemaining).toList();
-      _byRole = <String, List<ChoreInstance>>{};
-      for (final instance in undone) {
-        _byRole.putIfAbsent(instance.role.displayName, () => []).add(instance);
+      _byRole = <FarmRole, List<ChoreInstance>>{};
+      for (final instance in instances) {
+        if (!instance.status.isRemaining) continue;
+        _byRole.putIfAbsent(instance.role, () => []).add(instance);
       }
       _loading = false;
     });
   }
 
+  Future<void> _newItem() async {
+    final created = await showNewItemDialog(
+      context: context,
+      repository: widget.repository,
+      today: _today,
+    );
+    if (created && mounted) _refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final roles = _byRole.keys.toList()..sort();
     return Scaffold(
       appBar: AppBar(title: const Text('Remaining Today')),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'New chore or task',
+        onPressed: _newItem,
+        child: const Icon(Icons.add),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _refresh,
-              child: roles.isEmpty
+              child: _byRole.isEmpty
                   ? ListView(
                       children: const [
                         Padding(
@@ -60,41 +76,33 @@ class _UndoneChoresScreenState extends State<UndoneChoresScreen> {
                       ],
                     )
                   : ListView(
+                      padding: const EdgeInsets.only(bottom: 88),
                       children: [
-                        for (final role in roles) ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    role,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(color: FarmColors.soilBrown),
-                                  ),
-                                ),
-                                Text(
-                                  '${_byRole[role]!.length} remaining',
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: FarmColors.dawnAmber),
-                                ),
-                              ],
-                            ),
-                          ),
-                          for (final instance in _byRole[role]!)
-                            ChoreCard(
-                              instance: instance,
-                              onTap: () => showStatusActions(
-                                context: context,
-                                repository: widget.repository,
-                                instance: instance,
-                                today: _today,
-                                onChanged: _refresh,
+                        for (final role in FarmRoles.all)
+                          if (_byRole[role] case final instances?) ...[
+                            RoleSectionHeader(
+                              role: role,
+                              trailing: Text(
+                                '${instances.length} remaining',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: roleAccent(role),
+                                      fontWeight: FontWeight.bold,
+                                    ),
                               ),
                             ),
-                        ],
+                            for (final instance in instances)
+                              ChoreCard(
+                                instance: instance,
+                                onTap: () => showStatusActions(
+                                  context: context,
+                                  repository: widget.repository,
+                                  instance: instance,
+                                  today: _today,
+                                  onChanged: _refresh,
+                                ),
+                              ),
+                          ],
                       ],
                     ),
             ),

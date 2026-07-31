@@ -8,6 +8,7 @@ import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/screens/my_chores_screen.dart';
 import 'package:farm_chore/screens/undone_chores_screen.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
+import 'package:farm_chore/widgets/role_section_header.dart';
 import 'package:nostr/nostr.dart';
 
 Future<ChoreRepository> seed({
@@ -174,6 +175,74 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('All done for today.'), findsOneWidget);
+    });
+
+    testWidgets('roles always appear in canonical order', (tester) async {
+      final db = await AppDatabase.openInMemory();
+      final repo = ChoreRepository(
+        database: db,
+        keys: Keys.generate(),
+        farmPubkey: 'f' * 64,
+      );
+      await repo.saveRoleDefaultSet(
+        const RoleDefaultSet(
+          role: FarmRole.feeders,
+          chores: [
+            ChoreDefault(title: 'Feed cows', weekdays: [1, 2, 3, 4, 5, 6]),
+          ],
+        ),
+      );
+      await repo.saveRoleDefaultSet(
+        const RoleDefaultSet(
+          role: FarmRole.pourers,
+          chores: [
+            ChoreDefault(title: 'Bottle milk', weekdays: [1, 2, 3, 4, 5, 6]),
+          ],
+        ),
+      );
+      await repo.ensureDayGenerated(friday);
+      addTearDown(repo.database.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: farmTheme(),
+          home: UndoneChoresScreen(repository: repo, today: friday),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final headers = tester
+          .widgetList(find.byType(RoleSectionHeader))
+          .map((w) => (w as RoleSectionHeader).role)
+          .toList();
+      expect(headers, [FarmRole.pourers, FarmRole.feeders]);
+    });
+
+    testWidgets('assigns a chore to me from the status sheet', (tester) async {
+      final repo = await seed(assignee: me, today: friday);
+      addTearDown(repo.database.close);
+      final milking = (await repo.loadInstancesForDate(friday)).first;
+      await repo.assign(milking, ''); // unassign first
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: farmTheme(),
+          home: UndoneChoresScreen(repository: repo, today: friday),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Morning milking'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Assign to…'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Me'));
+      await tester.pumpAndSettle();
+
+      final after = (await repo.loadInstancesForDate(
+        friday,
+      )).firstWhere((i) => i.title == 'Morning milking');
+      expect(after.assignee, repo.myPubkey);
     });
   });
 }

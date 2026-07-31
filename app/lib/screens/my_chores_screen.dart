@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/widgets/chore_card.dart';
+import 'package:farm_chore/widgets/new_item_dialog.dart';
 import 'package:farm_chore/widgets/status_actions_sheet.dart';
 
 /// Today's instances assigned to my pubkey, across all roles.
@@ -49,6 +50,18 @@ class _MyChoresScreenState extends State<MyChoresScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('My Chores')),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'New chore or task',
+        onPressed: () async {
+          final created = await showNewItemDialog(
+            context: context,
+            repository: widget.repository,
+            today: _today,
+          );
+          if (created && mounted) _refresh();
+        },
+        child: const Icon(Icons.add),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(

@@ -3,6 +3,7 @@ import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/widgets/chore_card.dart';
+import 'package:farm_chore/widgets/new_item_dialog.dart';
 import 'package:farm_chore/widgets/status_actions_sheet.dart';
 
 import 'defaults_screen.dart';
@@ -68,6 +69,18 @@ class _RoleChoresScreenState extends State<RoleChoresScreen> {
             },
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'New chore or task',
+        onPressed: () async {
+          final created = await showNewItemDialog(
+            context: context,
+            repository: widget.repository,
+            today: _today,
+          );
+          if (created && mounted) _refresh();
+        },
+        child: const Icon(Icons.add),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

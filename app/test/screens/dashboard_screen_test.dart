@@ -116,7 +116,9 @@ void main() {
     addTearDown(repo.database.close);
     await pumpDashboard(tester, repo);
 
-    await tester.tap(find.byTooltip('Add task'));
+    await tester.tap(find.byTooltip('New chore or task'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Task'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextField, 'What needs doing?'),
@@ -129,6 +131,37 @@ void main() {
     final tasks = await repo.loadInstancesForDate(friday);
     final task = tasks.firstWhere((i) => i.title == 'Fix the gate latch');
     expect(task.type, ChoreType.task);
+  });
+
+  testWidgets('new dialog can add a chore to defaults and assign to me', (
+    tester,
+  ) async {
+    final repo = await seedRepository(today: friday);
+    addTearDown(repo.database.close);
+    await pumpDashboard(tester, repo);
+
+    await tester.tap(find.byTooltip('New chore or task'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'What needs doing?'),
+      'Ice the milk',
+    );
+    await tester.tap(find.text('Unassigned'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Me').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add to role defaults'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+
+    // Instance exists today, assigned to me, and repeats in the defaults.
+    final instances = await repo.loadInstancesForDate(friday);
+    final ice = instances.firstWhere((i) => i.title == 'Ice the milk');
+    expect(ice.assignee, repo.myPubkey);
+    final base = await repo.loadBaseRoleDefaultSets();
+    final milkers = base.singleWhere((s) => s.role == FarmRole.milkers);
+    expect(milkers.chores.map((c) => c.title), contains('Ice the milk'));
   });
 
   testWidgets('marking a chore done updates the dashboard count', (

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/data/demo_seed.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
-import 'package:farm_chore/domain/daily_generator.dart';
 import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:farm_chore/widgets/chore_card.dart';
+import 'package:farm_chore/widgets/new_item_dialog.dart';
+import 'package:farm_chore/widgets/role_section_header.dart';
 import 'package:farm_chore/widgets/status_actions_sheet.dart';
 
 import 'role_chores_screen.dart';
@@ -88,19 +89,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: _gridMode ? _gridBody() : _listBody(),
             ),
       floatingActionButton: FloatingActionButton(
-        tooltip: 'Add task',
-        onPressed: _addTask,
-        child: const Icon(Icons.add),
+        tooltip: 'New chore or task',
+        onPressed: () async {
+          final created = await showNewItemDialog(
+            context: context,
+            repository: widget.repository,
+            today: _today,
+          );
+          if (created && mounted) _refresh();
+        },
       ),
     );
-  }
-
-  Future<void> _addTask() async {
-    final created = await showDialog<bool>(
-      context: context,
-      builder: (_) => _TaskDialog(repository: widget.repository, today: _today),
-    );
-    if (created == true && mounted) _refresh();
   }
 
   Widget _listBody() {
@@ -108,29 +107,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         _todayHeader(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 4),
         for (final role in FarmRoles.all) ...[
-          _RoleHeader(
+          RoleSectionHeader(
             role: role,
-            instances: _byRole[role]!,
+            trailing: _counts(role),
             onTap: () => _openRole(role),
           ),
-          const SizedBox(height: 8),
-          for (final instance in _byRole[role]!)
+          if (_byRole[role]!.isEmpty)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: ChoreCard(
-                instance: instance,
-                onTap: () => showStatusActions(
-                  context: context,
-                  repository: widget.repository,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No chores today',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: FarmColors.sabbath),
+              ),
+            )
+          else
+            for (final instance in _byRole[role]!)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: ChoreCard(
                   instance: instance,
-                  today: _today,
-                  onChanged: _refresh,
+                  onTap: () => showStatusActions(
+                    context: context,
+                    repository: widget.repository,
+                    instance: instance,
+                    today: _today,
+                    onChanged: _refresh,
+                  ),
                 ),
               ),
-            ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
         ],
       ],
     );
@@ -141,14 +150,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         _todayHeader(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 4),
         for (final role in FarmRoles.all) ...[
-          _RoleHeader(
+          RoleSectionHeader(
             role: role,
-            instances: _byRole[role]!,
+            trailing: _counts(role),
             onTap: () => _openRole(role),
           ),
-          const SizedBox(height: 8),
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
@@ -170,8 +178,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
         ],
+      ],
+    );
+  }
+
+  Widget _counts(FarmRole role) {
+    final open = _byRole[role]!.where((i) => i.status.isRemaining).length;
+    final done = _byRole[role]!.where((i) => i.status.isDone).length;
+    if (_byRole[role]!.isEmpty) return const SizedBox.shrink();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '$done done',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: FarmColors.cottonwoodGreen,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          '$open open',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: FarmColors.soilBrown,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ],
     );
   }
@@ -194,161 +228,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
     if (mounted) _refresh();
-  }
-}
-
-class _TaskDialog extends StatefulWidget {
-  const _TaskDialog({required this.repository, required this.today});
-
-  final ChoreRepository repository;
-  final DateTime today;
-
-  @override
-  State<_TaskDialog> createState() => _TaskDialogState();
-}
-
-class _TaskDialogState extends State<_TaskDialog> {
-  final _title = TextEditingController();
-  FarmRole _role = FarmRoles.all.first;
-
-  @override
-  void dispose() {
-    _title.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final title = _title.text.trim();
-    if (title.isEmpty) return;
-    await widget.repository.saveInstance(
-      ChoreInstance(
-        date: widget.today,
-        role: _role,
-        slug: DailyGenerator.slugify(title),
-        title: title,
-        type: ChoreType.task,
-      ),
-    );
-    if (mounted) Navigator.of(context).pop(true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Add task'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _title,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'What needs doing?',
-              hintText: 'e.g. Fix the gate latch',
-            ),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<FarmRole>(
-            initialValue: _role,
-            decoration: const InputDecoration(labelText: 'Role'),
-            items: [
-              for (final role in FarmRoles.all)
-                DropdownMenuItem(value: role, child: Text(role.displayName)),
-            ],
-            onChanged: (role) => setState(() => _role = role ?? _role),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(onPressed: _submit, child: const Text('Add')),
-      ],
-    );
-  }
-}
-
-class _RoleHeader extends StatelessWidget {
-  const _RoleHeader({
-    required this.role,
-    required this.instances,
-    required this.onTap,
-  });
-
-  final FarmRole role;
-  final List<ChoreInstance> instances;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final open = instances.where((i) => i.status.isRemaining).length;
-    final done = instances.where((i) => i.status.isDone).length;
-    final total = instances.length;
-    final accent = role == FarmRole.nonJsf
-        ? FarmColors.springBlue
-        : FarmColors.dawnAmber;
-    return Card(
-      elevation: 1,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: accent.withValues(alpha: 0.4)),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  role.displayName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(color: FarmColors.soilBrown),
-                ),
-              ),
-              if (total == 0)
-                Text(
-                  'No chores today',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: FarmColors.sabbath),
-                )
-              else
-                Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: FarmColors.cottonwoodGreen,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$done done',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '$open open',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const Icon(Icons.chevron_right, size: 18),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

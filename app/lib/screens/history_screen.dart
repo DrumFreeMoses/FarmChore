@@ -4,6 +4,7 @@ import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:farm_chore/widgets/chore_card.dart';
+import 'package:farm_chore/widgets/new_item_dialog.dart';
 
 /// Read-only history of instances over the last 3 months, filterable by
 /// role, member, and chore title.
@@ -75,6 +76,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
             onPressed: () => _showFilters(context),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'New chore or task',
+        onPressed: () async {
+          final created = await showNewItemDialog(
+            context: context,
+            repository: widget.repository,
+            today: _today,
+          );
+          if (created && mounted) _load();
+        },
+        child: const Icon(Icons.add),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
