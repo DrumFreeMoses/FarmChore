@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:nostr/nostr.dart' as nostr;
 
 /// A NIP-01 event: the unit of sync and the audit trail.
 class NostrEvent {
@@ -37,6 +38,43 @@ class NostrEvent {
   }
 
   String get idOrComputed => id ?? computedId;
+
+  /// Signs this event with [keys], producing a NIP-01 event id and
+  /// Schnorr signature over the canonical serialization.
+  NostrEvent signed(nostr.Keys keys) {
+    final id = computedId;
+    final sig = keys.sign(message: id);
+    return NostrEvent(
+      id: id,
+      pubKey: pubKey,
+      createdAt: createdAt,
+      kind: kind,
+      tags: tags,
+      content: content,
+      sig: sig,
+    );
+  }
+
+  /// Verifies the event id and Schnorr signature against [pubKey].
+  bool verifySignature() {
+    final id = this.id;
+    final sig = this.sig;
+    if (id == null || sig == null) {
+      return false;
+    }
+    if (id != computedId) {
+      return false;
+    }
+    try {
+      return nostr.Schnorr.verify(
+        publicKey: pubKey,
+        message: id,
+        signature: sig,
+      );
+    } catch (_) {
+      return false;
+    }
+  }
 
   NostrEvent copyWith({
     String? id,

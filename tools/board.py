@@ -13,6 +13,11 @@ Commands:
                            tab-separated column group is not used)
   list                     Print board items: status, sprint, priority, title.
   ids                      Print project/field/option IDs (for debugging).
+  move <title-substring> <Status>
+                           Move matching item(s) to a Status (Todo/In
+                           Progress/Done).
+  set-sprint <title-substring> <Sprint>
+                           Reassign matching item(s) to a sprint.
 
 Config at the top of this file; all IDs are verified live before use.
 """
@@ -179,6 +184,56 @@ def cmd_bootstrap(tsv_path):
         print(f"board: {title}")
 
 
+def _items():
+    data = graphql(
+        """query($id: ID!) {
+  node(id: $id) { ... on ProjectV2 {
+    items(first: 100) { nodes {
+      id
+      content { ... on Issue { number title } }
+    } }
+  } }
+}""",
+        id=PROJECT_ID,
+    )
+    return [i for i in data["node"]["items"]["nodes"] if i["content"]]
+
+
+def _set_option(item_id, field, option):
+    q = """mutation($p: ID!, $i: ID!, $o: String!) {
+  a: updateProjectV2ItemFieldValue(input: {projectId: $p, itemId: $i, fieldId: "%s", value: {singleSelectOptionId: $o}}) { projectV2Item { id } }
+}""" % FIELD_IDS[field]
+    graphql(q, p=PROJECT_ID, i=item_id, o=option)
+
+
+def cmd_move(substr, status):
+    option = OPTION_IDS["Status"].get(status)
+    if option is None:
+        sys.exit(f"unknown status: {status} (use Todo, In Progress, Done)")
+    moved = 0
+    for item in _items():
+        if substr.lower() in item["content"]["title"].lower():
+            _set_option(item["id"], "Status", option)
+            print(f"#{item['content']['number']} -> {status}: {item['content']['title']}")
+            moved += 1
+    if moved == 0:
+        print(f"no items matching {substr!r}")
+
+
+def cmd_set_sprint(substr, sprint):
+    option = OPTION_IDS["Sprint"].get(sprint)
+    if option is None:
+        sys.exit(f"unknown sprint: {sprint} (use Sprint 1..4)")
+    moved = 0
+    for item in _items():
+        if substr.lower() in item["content"]["title"].lower():
+            _set_option(item["id"], "Sprint", option)
+            print(f"#{item['content']['number']} -> {sprint}: {item['content']['title']}")
+            moved += 1
+    if moved == 0:
+        print(f"no items matching {substr!r}")
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "list"
     if cmd == "list":
@@ -189,5 +244,13 @@ if __name__ == "__main__":
         if len(sys.argv) < 3:
             sys.exit("usage: board.py bootstrap <backlog.tsv>")
         cmd_bootstrap(sys.argv[2])
+    elif cmd == "move":
+        if len(sys.argv) < 4:
+            sys.exit("usage: board.py move <title-substring> <Status>")
+        cmd_move(sys.argv[2], sys.argv[3])
+    elif cmd == "set-sprint":
+        if len(sys.argv) < 4:
+            sys.exit("usage: board.py set-sprint <title-substring> <Sprint>")
+        cmd_set_sprint(sys.argv[2], sys.argv[3])
     else:
         sys.exit(f"unknown command: {cmd}")
