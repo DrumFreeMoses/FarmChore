@@ -84,6 +84,28 @@ void main() {
     expect(find.text('Evening milking'), findsOneWidget);
   });
 
+  testWidgets('dashboard toggles between list and two-column grid', (
+    tester,
+  ) async {
+    final repo = await seedRepository(today: friday);
+    addTearDown(repo.database.close);
+    await pumpDashboard(tester, repo);
+
+    expect(find.text('Morning milking'), findsOneWidget); // list mode
+
+    await tester.tap(find.byTooltip('Show grid'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Morning milking'), findsNothing);
+    expect(find.text('3 open'), findsOneWidget); // grid cards show counts
+    expect(find.byTooltip('Show list'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Show list'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Morning milking'), findsOneWidget);
+  });
+
   testWidgets('marking a chore done updates the dashboard count', (
     tester,
   ) async {
