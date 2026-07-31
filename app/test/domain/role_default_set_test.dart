@@ -90,15 +90,18 @@ void main() {
       );
     });
 
-    test('rejects a malformed d tag', () {
-      final event = defaultSet.toNostrEvent(pubKey: farmPubkey, createdAt: 1);
-      final bad = event.copyWith(
+    test('rejects a malformed d tag when content has no role', () {
+      final event = NostrEvent(
+        pubKey: farmPubkey,
+        createdAt: 1,
+        kind: roleDefaultSetKind,
+        content: '{"chores":[]}',
         tags: [
           ['d', 'not-a-role'],
         ],
       );
       expect(
-        () => RoleDefaultSet.fromNostrEvent(bad),
+        () => RoleDefaultSet.fromNostrEvent(event),
         throwsA(isA<FormatException>()),
       );
     });

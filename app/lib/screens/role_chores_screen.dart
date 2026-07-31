@@ -5,6 +5,8 @@ import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/widgets/chore_card.dart';
 import 'package:farm_chore/widgets/status_actions_sheet.dart';
 
+import 'defaults_screen.dart';
+
 /// One role's chore list for a day (e.g. "Milker's Chores").
 /// Tapping an item opens status actions: done, skip, defer, cancel.
 class RoleChoresScreen extends StatefulWidget {
@@ -46,7 +48,27 @@ class _RoleChoresScreenState extends State<RoleChoresScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.role.displayName)),
+      appBar: AppBar(
+        title: Text(widget.role.displayName),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: 'Edit defaults',
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DefaultsScreen(
+                    repository: widget.repository,
+                    role: widget.role,
+                    today: _today,
+                  ),
+                ),
+              );
+              if (mounted) _refresh();
+            },
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(

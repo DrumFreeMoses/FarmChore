@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/data/demo_seed.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
+import 'package:farm_chore/domain/daily_generator.dart';
 import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:farm_chore/widgets/chore_card.dart';
@@ -38,7 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _refresh() async {
     final hasDefaults =
-        (await widget.repository.loadRoleDefaultSets()).isNotEmpty;
+        (await widget.repository.loadBaseRoleDefaultSets()).isNotEmpty;
     await widget.repository.ensureDayGenerated(_today);
     final instances = await widget.repository.loadInstancesForDate(_today);
     if (!mounted) return;
@@ -86,7 +87,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onRefresh: _refresh,
               child: _gridMode ? _gridBody() : _listBody(),
             ),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Add task',
+        onPressed: _addTask,
+        child: const Icon(Icons.add),
+      ),
     );
+  }
+
+  Future<void> _addTask() async {
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (_) => _TaskDialog(repository: widget.repository, today: _today),
+    );
+    if (created == true && mounted) _refresh();
   }
 
   Widget _listBody() {
@@ -128,22 +142,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         _todayHeader(),
         const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.4,
-          children: [
-            for (final role in FarmRoles.all)
-              _RoleCard(
-                role: role,
-                instances: _byRole[role]!,
-                onTap: () => _openRole(role),
-              ),
-          ],
-        ),
+        for (final role in FarmRoles.all) ...[
+          _RoleHeader(
+            role: role,
+            instances: _byRole[role]!,
+            onTap: () => _openRole(role),
+          ),
+          const SizedBox(height: 8),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            mainAxisExtent: 76,
+            children: [
+              for (final instance in _byRole[role]!)
+                ChoreCard(
+                  instance: instance,
+                  onTap: () => showStatusActions(
+                    context: context,
+                    repository: widget.repository,
+                    instance: instance,
+                    today: _today,
+                    onChanged: _refresh,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
       ],
     );
   }
@@ -169,82 +197,75 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _RoleCard extends StatelessWidget {
-  const _RoleCard({
-    required this.role,
-    required this.instances,
-    required this.onTap,
-  });
+class _TaskDialog extends StatefulWidget {
+  const _TaskDialog({required this.repository, required this.today});
 
-  final FarmRole role;
-  final List<ChoreInstance> instances;
-  final VoidCallback onTap;
+  final ChoreRepository repository;
+  final DateTime today;
+
+  @override
+  State<_TaskDialog> createState() => _TaskDialogState();
+}
+
+class _TaskDialogState extends State<_TaskDialog> {
+  final _title = TextEditingController();
+  FarmRole _role = FarmRoles.all.first;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final title = _title.text.trim();
+    if (title.isEmpty) return;
+    await widget.repository.saveInstance(
+      ChoreInstance(
+        date: widget.today,
+        role: _role,
+        slug: DailyGenerator.slugify(title),
+        title: title,
+        type: ChoreType.task,
+      ),
+    );
+    if (mounted) Navigator.of(context).pop(true);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final open = instances.where((i) => i.status.isRemaining).length;
-    final done = instances.where((i) => i.status.isDone).length;
-    final total = instances.length;
-    final accent = role == FarmRole.nonJsf
-        ? FarmColors.springBlue
-        : FarmColors.dawnAmber;
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: accent.withValues(alpha: 0.4)),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                role.displayName,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(color: FarmColors.soilBrown),
-              ),
-              if (total == 0)
-                Text(
-                  'No chores today',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: FarmColors.sabbath),
-                )
-              else
-                Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: FarmColors.cottonwoodGreen,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$done done',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const Spacer(),
-                    Text(
-                      '$open open',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-            ],
+    return AlertDialog(
+      title: const Text('Add task'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _title,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'What needs doing?',
+              hintText: 'e.g. Fix the gate latch',
+            ),
           ),
-        ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<FarmRole>(
+            initialValue: _role,
+            decoration: const InputDecoration(labelText: 'Role'),
+            items: [
+              for (final role in FarmRoles.all)
+                DropdownMenuItem(value: role, child: Text(role.displayName)),
+            ],
+            onChanged: (role) => setState(() => _role = role ?? _role),
+          ),
+        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Add')),
+      ],
     );
   }
 }

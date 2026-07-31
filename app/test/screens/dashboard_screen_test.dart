@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:farm_chore/data/app_database.dart';
 import 'package:farm_chore/data/chore_repository.dart';
+import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/role_default_set.dart';
 import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/screens/dashboard_screen.dart';
@@ -96,14 +97,38 @@ void main() {
     await tester.tap(find.byTooltip('Show grid'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Morning milking'), findsNothing);
-    expect(find.text('3 open'), findsOneWidget); // grid cards show counts
+    // Grid still lists every chore, two-up under each role header.
+    expect(find.text('Morning milking'), findsOneWidget);
+    expect(find.text('Clean stalls'), findsOneWidget);
+    expect(find.text('3 open'), findsOneWidget);
     expect(find.byTooltip('Show list'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Show list'));
     await tester.pumpAndSettle();
 
     expect(find.text('Morning milking'), findsOneWidget);
+  });
+
+  testWidgets('adding a one-time task shows it on today\'s dashboard', (
+    tester,
+  ) async {
+    final repo = await seedRepository(today: friday);
+    addTearDown(repo.database.close);
+    await pumpDashboard(tester, repo);
+
+    await tester.tap(find.byTooltip('Add task'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'What needs doing?'),
+      'Fix the gate latch',
+    );
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Fix the gate latch'), findsOneWidget);
+    final tasks = await repo.loadInstancesForDate(friday);
+    final task = tasks.firstWhere((i) => i.title == 'Fix the gate latch');
+    expect(task.type, ChoreType.task);
   });
 
   testWidgets('marking a chore done updates the dashboard count', (

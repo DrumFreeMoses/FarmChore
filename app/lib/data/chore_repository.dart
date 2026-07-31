@@ -9,6 +9,7 @@ import '../domain/chore_instance.dart';
 import '../domain/daily_generator.dart';
 import '../domain/edit_event.dart';
 import '../domain/role_default_set.dart';
+import '../domain/roles.dart';
 import '../nostr/nostr_event.dart';
 
 /// The single door to chore data: reads and writes the local event log,
@@ -73,6 +74,12 @@ class ChoreRepository {
         .toList();
   }
 
+  /// Only the base (active) sets: the ones daily generation uses.
+  Future<List<RoleDefaultSet>> loadBaseRoleDefaultSets() async {
+    final all = await loadRoleDefaultSets();
+    return all.where((s) => s.isBase).toList();
+  }
+
   /// Saves a role default set, replacing any prior set for the role.
   Future<void> saveRoleDefaultSet(RoleDefaultSet set) async {
     final event = set.toNostrEvent(
@@ -81,6 +88,25 @@ class ChoreRepository {
       farmPubkey: farmPubkey,
     );
     await _persist(event);
+  }
+
+  /// Stores the current chores of [role] as a named variant
+  /// (`d = role:name`); does not affect what is generated.
+  Future<void> saveRoleVariant(
+    FarmRole role,
+    String name,
+    List<ChoreDefault> chores,
+  ) async {
+    await saveRoleDefaultSet(
+      RoleDefaultSet(role: role, chores: chores, name: name),
+    );
+  }
+
+  /// Makes [set]'s chores the role's active base set (LWW replace).
+  Future<void> activateRoleSet(RoleDefaultSet set) async {
+    await saveRoleDefaultSet(
+      RoleDefaultSet(role: set.role, chores: set.chores),
+    );
   }
 
   /// Instances for [date], newest event first (LWW by createdAt per d tag).
@@ -114,7 +140,7 @@ class ChoreRepository {
   /// persisting only the ones not already in the log. Returns the number
   /// of new instances created.
   Future<int> ensureDayGenerated(DateTime date) async {
-    final defaults = await loadRoleDefaultSets();
+    final defaults = await loadBaseRoleDefaultSets();
     final generated = DailyGenerator.generate(defaults: defaults, date: date);
     final existing = await loadInstancesForDate(date);
     final existingTags = existing.map((i) => i.dTag).toSet();
@@ -132,6 +158,28 @@ class ChoreRepository {
       created++;
     }
     return created;
+  }
+
+  /// Regenerates [date] to match the base default sets: creates missing
+  /// open chores and cancels open chores that are no longer in the
+  /// defaults. One-off tasks and non-open instances are left untouched.
+  /// Returns the number of instances created or cancelled.
+  Future<int> syncDayToDefaults(DateTime date) async {
+    var changed = await ensureDayGenerated(date);
+    final defaults = await loadBaseRoleDefaultSets();
+    final expected = DailyGenerator.generate(defaults: defaults, date: date);
+    final expectedKeys = {for (final i in expected) '${i.role.id}|${i.slug}'};
+    final instances = await loadInstancesForDate(date);
+    for (final instance in instances) {
+      if (instance.type != ChoreType.chore) continue;
+      if (!instance.status.isOpen) continue;
+      if (expectedKeys.contains('${instance.role.id}|${instance.slug}')) {
+        continue;
+      }
+      await editStatus(instance, ChoreStatus.cancelled);
+      changed++;
+    }
+    return changed;
   }
 
   /// Persists a one-off instance (used for tasks and inline adds).
@@ -253,7 +301,7 @@ class ChoreRepository {
     ChoreInstance instance,
     String newTitle,
   ) async {
-    final sets = await loadRoleDefaultSets();
+    final sets = await loadBaseRoleDefaultSets();
     final set = sets.where((s) => s.role == instance.role).firstOrNull;
     if (set == null) return;
     final chores = [
