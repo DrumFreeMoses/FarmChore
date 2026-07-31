@@ -10,7 +10,10 @@ void main() {
         createdAt: 1673342637,
         kind: 1,
         tags: [
-          ['e', '3da979448d9ba263864c4d6f14997c079ba216ffa52b32a6ad98c8e6cdd3c1e6'],
+          [
+            'e',
+            '3da979448d9ba263864c4d6f14997c079ba216ffa52b32a6ad98c8e6cdd3c1e6',
+          ],
         ],
         content: 'Hello world',
       );
@@ -23,7 +26,8 @@ void main() {
 
     test('id changes when content changes', () {
       final a = NostrEvent(
-        pubKey: '6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93',
+        pubKey:
+            '6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93',
         createdAt: 1673342637,
         kind: 31501,
         content: 'feed the pigs',
@@ -34,7 +38,8 @@ void main() {
 
     test('serializes tags compactly (no spaces)', () {
       final event = NostrEvent(
-        pubKey: '6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93',
+        pubKey:
+            '6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93',
         createdAt: 1,
         kind: 31500,
         tags: [

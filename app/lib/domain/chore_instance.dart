@@ -13,8 +13,7 @@ enum ChoreStatus {
 
   bool get isOpen => this == open;
   bool get isDone => this == done;
-  bool get isRemaining =>
-      this == open || this == deferred || this == skipped;
+  bool get isRemaining => this == open || this == deferred || this == skipped;
 }
 
 /// A scheduled chore or task instance for one role on one date (kind 31501).
@@ -42,8 +41,7 @@ class ChoreInstance {
   final String? assignee;
 
   /// Canonical addressable id: `date|role|slug` (NIP-01 `d` tag).
-  String get dTag =>
-      '${_isoDate(date)}|${role.id}|$slug';
+  String get dTag => '${_isoDate(date)}|${role.id}|$slug';
 
   ChoreInstance copyWith({
     ChoreStatus? status,
@@ -66,10 +64,8 @@ class ChoreInstance {
     );
   }
 
-  ChoreInstance markDone() => copyWith(
-        status: ChoreStatus.done,
-        completedAt: DateTime.now(),
-      );
+  ChoreInstance markDone() =>
+      copyWith(status: ChoreStatus.done, completedAt: DateTime.now());
 
   ChoreInstance markSkipped() => _transition(ChoreStatus.skipped);
 
