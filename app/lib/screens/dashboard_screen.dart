@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:farm_chore/data/chore_repository.dart';
+import 'package:farm_chore/data/demo_seed.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
@@ -24,6 +25,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late final DateTime _today = widget.today ?? DateTime.now();
   Map<FarmRole, List<ChoreInstance>> _byRole = {};
   bool _loading = true;
+  bool _hasDefaults = false;
 
   @override
   void initState() {
@@ -32,10 +34,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _refresh() async {
+    final hasDefaults =
+        (await widget.repository.loadRoleDefaultSets()).isNotEmpty;
     await widget.repository.ensureDayGenerated(_today);
     final instances = await widget.repository.loadInstancesForDate(_today);
     if (!mounted) return;
     setState(() {
+      _hasDefaults = hasDefaults;
       _byRole = {
         for (final role in FarmRoles.all)
           role: instances.where((i) => i.role == role).toList(),
@@ -44,10 +49,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  Future<void> _loadDemoData() async {
+    final messenger = ScaffoldMessenger.of(context);
+    await seedFarmDefaults(widget.repository);
+    await _refresh();
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Demo data loaded — edit to fit the farm')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('FarmChore')),
+      appBar: AppBar(
+        title: const Text('FarmChore'),
+        actions: [
+          if (!_hasDefaults)
+            IconButton(
+              icon: const Icon(Icons.agriculture),
+              tooltip: 'Load demo data',
+              onPressed: _loadDemoData,
+            ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
