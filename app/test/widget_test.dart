@@ -1,30 +1,32 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:farm_chore/main.dart';
+import 'package:farm_chore/data/app_database.dart';
+import 'package:farm_chore/data/chore_repository.dart';
+import 'package:farm_chore/screens/home_shell.dart';
+import 'package:farm_chore/theme/farm_theme.dart';
+import 'package:nostr/nostr.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('shell boots and shows the dashboard', (tester) async {
+    final db = await AppDatabase.openInMemory();
+    addTearDown(db.close);
+    final repo = ChoreRepository(database: db, keys: Keys.generate());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: farmTheme(),
+        home: HomeShell(
+          repository: repo,
+          myPubkey: 'a' * 64,
+          today: DateTime(2026, 7, 31),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('FarmChore'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('My Chores'), findsOneWidget);
+    expect(find.text('Remaining'), findsOneWidget);
+    expect(find.text('History'), findsOneWidget);
   });
 }

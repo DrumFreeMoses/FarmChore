@@ -162,14 +162,18 @@ class ChoreRepository {
   }
 
   /// Applies a status transition as an edit (kind 31503) to the instance.
+  ///
+  /// Deferring passes [deferredTo] (the day the chore resurfaces); the
+  /// instance then carries the deferred status and date.
   Future<ChoreInstance> editStatus(
     ChoreInstance instance,
-    ChoreStatus status,
-  ) async {
+    ChoreStatus status, {
+    DateTime? deferredTo,
+  }) async {
     final updated = instance.copyWith(
       status: status,
       completedAt: status == ChoreStatus.done ? DateTime.now() : null,
-      deferredTo: null,
+      deferredTo: deferredTo,
     );
     await saveInstance(updated);
     await _persist(
@@ -185,6 +189,85 @@ class ChoreRepository {
       ),
     );
     return updated;
+  }
+
+  /// Instances between [from] and [to] (inclusive), newest first. Used by
+  /// history and the "My Chores" views.
+  Future<List<ChoreInstance>> loadInstancesBetween(
+    DateTime from,
+    DateTime to,
+  ) async {
+    final rows = await database.eventsForKind(choreInstanceKind).get();
+    final latest = <String, Event>{};
+    for (final row in rows) {
+      final key = _dTag(row) ?? row.id;
+      final existing = latest[key];
+      if (existing == null ||
+          row.createdAt > existing.createdAt ||
+          (row.createdAt == existing.createdAt &&
+              row.id.compareTo(existing.id) > 0)) {
+        latest[key] = row;
+      }
+    }
+    final instances = <ChoreInstance>[];
+    for (final row in latest.values) {
+      final instance = ChoreInstance.fromNostrEvent(_toNostr(row));
+      if (!instance.date.isBefore(from) && !instance.date.isAfter(to)) {
+        instances.add(instance);
+      }
+    }
+    instances.sort((a, b) {
+      final byDate = b.date.compareTo(a.date);
+      return byDate != 0 ? byDate : a.slug.compareTo(b.slug);
+    });
+    return instances;
+  }
+
+  /// Renames an instance. With [EditScope.default_] the matching role
+  /// default set is updated too, so future days use the new title.
+  Future<void> updateTitle(
+    ChoreInstance instance,
+    String newTitle, {
+    EditScope scope = EditScope.oneTime,
+  }) async {
+    final updated = instance.copyWith(title: newTitle);
+    await saveInstance(updated);
+    await _persist(
+      EditEvent(
+        instanceId: instance.dTag,
+        field: 'title',
+        value: newTitle,
+        scope: scope,
+      ).toNostrEvent(
+        pubKey: keys.public,
+        createdAt: _now(),
+        farmPubkey: farmPubkey,
+      ),
+    );
+    if (scope == EditScope.default_) {
+      await _updateDefaultTitle(instance, newTitle);
+    }
+  }
+
+  Future<void> _updateDefaultTitle(
+    ChoreInstance instance,
+    String newTitle,
+  ) async {
+    final sets = await loadRoleDefaultSets();
+    final set = sets.where((s) => s.role == instance.role).firstOrNull;
+    if (set == null) return;
+    final chores = [
+      for (final chore in set.chores)
+        if (chore.title == instance.title)
+          ChoreDefault(
+            title: newTitle,
+            weekdays: chore.weekdays,
+            assigneeHint: chore.assigneeHint,
+          )
+        else
+          chore,
+    ];
+    await saveRoleDefaultSet(RoleDefaultSet(role: set.role, chores: chores));
   }
 
   String? _dTag(Event row) {
