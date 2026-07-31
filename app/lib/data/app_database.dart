@@ -23,10 +23,10 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async {
-          await m.createAll();
-        },
-      );
+    onCreate: (m) async {
+      await m.createAll();
+    },
+  );
 
   /// Events with a given NIP-01 kind, oldest first.
   Selectable<Event> eventsForKind(int kind) =>

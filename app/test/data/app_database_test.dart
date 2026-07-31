@@ -9,7 +9,9 @@ void main() {
       addTearDown(db.close);
 
       expect(db.schemaVersion, 1);
-      final tables = await db.customSelect("SELECT name FROM sqlite_master WHERE type='table'").get();
+      final tables = await db
+          .customSelect("SELECT name FROM sqlite_master WHERE type='table'")
+          .get();
       final names = tables.map((r) => r.data['name'] as String).toSet();
       expect(names, contains('events'));
     });
@@ -18,19 +20,26 @@ void main() {
       final db = await AppDatabase.openInMemory();
       addTearDown(db.close);
 
-      await db.into(db.events).insert(EventsCompanion.insert(
-            id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-            pubkey:
-                '6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93',
-            kind: 31501,
-            createdAt: 1673342637,
-            content: '{"title":"Morning milking"}',
-            sig: Value('a1b2' * 32),
-            tags: const Value('[["role","Milkers"]]'),
-          ));
+      await db
+          .into(db.events)
+          .insert(
+            EventsCompanion.insert(
+              id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              pubkey:
+                  '6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93',
+              kind: 31501,
+              createdAt: 1673342637,
+              content: '{"title":"Morning milking"}',
+              sig: Value('a1b2' * 32),
+              tags: const Value('[["role","Milkers"]]'),
+            ),
+          );
 
       final got = await db.eventsForKind(31501).getSingle();
-      expect(got.id, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+      expect(
+        got.id,
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      );
       expect(got.kind, 31501);
     });
 
@@ -49,26 +58,27 @@ void main() {
         tags: const Value('[]'),
       );
       await db.into(db.events).insert(row);
-      await expectLater(
-        db.into(db.events).insert(row),
-        throwsA(isA<Object>()),
-      );
+      await expectLater(db.into(db.events).insert(row), throwsA(isA<Object>()));
     });
 
     test('unsynced events are tracked for the outbound queue', () async {
       final db = await AppDatabase.openInMemory();
       addTearDown(db.close);
 
-      await db.into(db.events).insert(EventsCompanion.insert(
-            id: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
-            pubkey:
-                '6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93',
-            kind: 31502,
-            createdAt: 2,
-            content: '',
-            sig: Value('a1b2' * 32),
-            tags: const Value('[]'),
-          ));
+      await db
+          .into(db.events)
+          .insert(
+            EventsCompanion.insert(
+              id: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+              pubkey:
+                  '6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93',
+              kind: 31502,
+              createdAt: 2,
+              content: '',
+              sig: Value('a1b2' * 32),
+              tags: const Value('[]'),
+            ),
+          );
 
       final queued = await db.pendingEvents().get();
       expect(queued.length, 1);

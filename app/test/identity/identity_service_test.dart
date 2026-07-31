@@ -33,14 +33,8 @@ void main() {
 
     test('rejects malformed secrets', () async {
       final service = IdentityService(InMemoryKeyStorage());
-      expect(
-        () => service.importIdentity('not-a-secret'),
-        throwsArgumentError,
-      );
-      expect(
-        () => service.importIdentity('a' * 63),
-        throwsArgumentError,
-      );
+      expect(() => service.importIdentity('not-a-secret'), throwsArgumentError);
+      expect(() => service.importIdentity('a' * 63), throwsArgumentError);
     });
   });
 }

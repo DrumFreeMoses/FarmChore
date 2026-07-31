@@ -60,7 +60,8 @@ class IdentityService {
 
 bool isHex(String s) {
   for (final c in s.codeUnits) {
-    final ok = (c >= 0x30 && c <= 0x39) ||
+    final ok =
+        (c >= 0x30 && c <= 0x39) ||
         (c >= 0x61 && c <= 0x66) ||
         (c >= 0x41 && c <= 0x46);
     if (!ok) {

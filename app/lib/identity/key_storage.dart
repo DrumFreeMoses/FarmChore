@@ -30,7 +30,7 @@ class InMemoryKeyStorage implements KeyStorage {
 /// Real keystore backed by the platform secure enclave/keychain.
 class SecureKeyStorage implements KeyStorage {
   SecureKeyStorage({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   static const _key = 'farmchore_member_nsec';
 
