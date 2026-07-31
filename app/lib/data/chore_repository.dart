@@ -1,0 +1,211 @@
+import 'dart:convert';
+
+import 'package:drift/drift.dart';
+import 'package:nostr/nostr.dart' hide Event;
+
+import '../data/app_database.dart';
+import '../domain/assignment.dart';
+import '../domain/chore_instance.dart';
+import '../domain/daily_generator.dart';
+import '../domain/edit_event.dart';
+import '../domain/role_default_set.dart';
+import '../nostr/nostr_event.dart';
+
+/// The single door to chore data: reads and writes the local event log,
+/// signs every write with the member keypair.
+class ChoreRepository {
+  ChoreRepository({
+    required this.database,
+    required this.keys,
+    this.farmPubkey,
+  });
+
+  final AppDatabase database;
+  final Keys keys;
+
+  /// Pubkey anchoring the farm namespace; attached to every signed event.
+  final String? farmPubkey;
+
+  int _lastCreatedAt = 0;
+
+  /// Monotonic created-at (seconds): guarantees strict LWW ordering even for
+  /// rapid writes within the same second.
+  int _now() {
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    _lastCreatedAt = now > _lastCreatedAt ? now : _lastCreatedAt + 1;
+    return _lastCreatedAt;
+  }
+
+  Future<void> _persist(NostrEvent event) async {
+    final signed = event.signed(keys);
+    await database
+        .into(database.events)
+        .insert(
+          EventsCompanion.insert(
+            id: signed.idOrComputed,
+            pubkey: signed.pubKey,
+            kind: signed.kind,
+            createdAt: signed.createdAt,
+            content: signed.content,
+            sig: Value(signed.sig ?? ''),
+            tags: Value(jsonEncode(signed.tags)),
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
+  }
+
+  /// Role default sets, latest event wins per role (addressable events).
+  Future<List<RoleDefaultSet>> loadRoleDefaultSets() async {
+    final rows = await database.eventsForKind(roleDefaultSetKind).get();
+    final latest = <String, Event>{};
+    for (final row in rows) {
+      final key = _dTag(row) ?? row.id;
+      final current = latest[key];
+      if (current == null ||
+          row.createdAt > current.createdAt ||
+          (row.createdAt == current.createdAt &&
+              row.id.compareTo(current.id) > 0)) {
+        latest[key] = row;
+      }
+    }
+    return latest.values
+        .map((row) => RoleDefaultSet.fromNostrEvent(_toNostr(row)))
+        .toList();
+  }
+
+  /// Saves a role default set, replacing any prior set for the role.
+  Future<void> saveRoleDefaultSet(RoleDefaultSet set) async {
+    final event = set.toNostrEvent(
+      pubKey: keys.public,
+      createdAt: _now(),
+      farmPubkey: farmPubkey,
+    );
+    await _persist(event);
+  }
+
+  /// Instances for [date], newest event first (LWW by createdAt per d tag).
+  Future<List<ChoreInstance>> loadInstancesForDate(DateTime date) async {
+    final rows = await database.eventsForKind(choreInstanceKind).get();
+    final latest = <String, Event>{};
+    for (final row in rows) {
+      final key = _dTag(row) ?? row.id;
+      final existing = latest[key];
+      if (existing == null ||
+          row.createdAt > existing.createdAt ||
+          (row.createdAt == existing.createdAt &&
+              row.id.compareTo(existing.id) > 0)) {
+        latest[key] = row;
+      }
+    }
+    final instances = <ChoreInstance>[];
+    for (final row in latest.values) {
+      final instance = ChoreInstance.fromNostrEvent(_toNostr(row));
+      if (instance.date.year == date.year &&
+          instance.date.month == date.month &&
+          instance.date.day == date.day) {
+        instances.add(instance);
+      }
+    }
+    instances.sort((a, b) => a.slug.compareTo(b.slug));
+    return instances;
+  }
+
+  /// Generates today's instances from the role defaults that run today,
+  /// persisting only the ones not already in the log. Returns the number
+  /// of new instances created.
+  Future<int> ensureDayGenerated(DateTime date) async {
+    final defaults = await loadRoleDefaultSets();
+    final generated = DailyGenerator.generate(defaults: defaults, date: date);
+    final existing = await loadInstancesForDate(date);
+    final existingTags = existing.map((i) => i.dTag).toSet();
+    var created = 0;
+    for (final instance in generated) {
+      if (existingTags.contains(instance.dTag)) {
+        continue;
+      }
+      final event = instance.toNostrEvent(
+        pubKey: keys.public,
+        createdAt: _now(),
+        farmPubkey: farmPubkey,
+      );
+      await _persist(event);
+      created++;
+    }
+    return created;
+  }
+
+  /// Persists a one-off instance (used for tasks and inline adds).
+  Future<void> saveInstance(ChoreInstance instance) async {
+    final event = instance.toNostrEvent(
+      pubKey: keys.public,
+      createdAt: _now(),
+      farmPubkey: farmPubkey,
+    );
+    await _persist(event);
+  }
+
+  /// Assigns (or re-assigns) [instance] to [assigneePubkey]. Self-assignment
+  /// is just an assignment whose signer is the assignee.
+  Future<void> assign(ChoreInstance instance, String assigneePubkey) async {
+    final assigned = instance.copyWith(assignee: assigneePubkey);
+    await saveInstance(assigned);
+    final event =
+        Assignment(
+          instanceId: instance.dTag,
+          assignee: assigneePubkey,
+        ).toNostrEvent(
+          pubKey: keys.public,
+          createdAt: _now(),
+          farmPubkey: farmPubkey,
+        );
+    await _persist(event);
+  }
+
+  /// Applies a status transition as an edit (kind 31503) to the instance.
+  Future<ChoreInstance> editStatus(
+    ChoreInstance instance,
+    ChoreStatus status,
+  ) async {
+    final updated = instance.copyWith(
+      status: status,
+      completedAt: status == ChoreStatus.done ? DateTime.now() : null,
+      deferredTo: null,
+    );
+    await saveInstance(updated);
+    await _persist(
+      EditEvent(
+        instanceId: instance.dTag,
+        field: 'status',
+        value: status.name,
+        scope: EditScope.oneTime,
+      ).toNostrEvent(
+        pubKey: keys.public,
+        createdAt: _now(),
+        farmPubkey: farmPubkey,
+      ),
+    );
+    return updated;
+  }
+
+  String? _dTag(Event row) {
+    final tags = jsonDecode(row.tags) as List;
+    for (final tag in tags) {
+      if (tag is List && tag.isNotEmpty && tag.first == 'd' && tag.length > 1) {
+        return tag[1] as String;
+      }
+    }
+    return null;
+  }
+
+  NostrEvent _toNostr(Event row) => NostrEvent(
+    id: row.id,
+    pubKey: row.pubkey,
+    createdAt: row.createdAt,
+    kind: row.kind,
+    content: row.content,
+    sig: row.sig.isEmpty ? null : row.sig,
+    tags: (jsonDecode(row.tags) as List)
+        .map((t) => (t as List).cast<String>())
+        .toList(),
+  );
+}

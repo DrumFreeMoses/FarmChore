@@ -14,6 +14,15 @@ enum FarmRole {
 
   /// Human name for the role's chore list page.
   final String displayName;
+
+  static FarmRole? fromIdOrNull(String id) {
+    for (final role in values) {
+      if (role.id == id) {
+        return role;
+      }
+    }
+    return null;
+  }
 }
 
 abstract final class FarmRoles {

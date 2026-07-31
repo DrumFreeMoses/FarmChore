@@ -131,10 +131,10 @@ def cmd_list():
         for fv in item["fieldValues"]["nodes"]:
             if fv.get("field"):
                 vals[fv["field"]["name"]] = fv["name"]
-        rows.append((vals.get("Status", "-"), vals.get("Sprint", "-"), vals.get("Priority", "-"), item["content"]["title"]))
+        rows.append((vals.get("Status", "-"), vals.get("Sprint", "-"), vals.get("Priority", "-"), item["content"]["title"], item["content"]["number"]))
     width = max(len(r[3]) for r in rows) if rows else 0
-    for status, sprint, pri, title in sorted(rows, key=lambda r: (r[1], r[2])):
-        print(f"{status:<11} {sprint:<8} {pri:<2} {title}")
+    for status, sprint, pri, title, num in sorted(rows, key=lambda r: (r[1], r[2])):
+        print(f"#{num:<3} {status:<11} {sprint:<8} {pri:<2} {title}")
 
 
 def cmd_bootstrap(tsv_path):

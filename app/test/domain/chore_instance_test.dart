@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/roles.dart';
+import 'package:farm_chore/nostr/nostr_event.dart';
 
 void main() {
+  final farmPubkey = 'f' * 64;
   group('roles', () {
     test('contains the six farm roles in canonical order', () {
       expect(FarmRoles.all, [
@@ -63,6 +65,86 @@ void main() {
       expect(instance.type, ChoreType.chore);
       final task = instance.copyWith(type: ChoreType.task);
       expect(task.type, ChoreType.task);
+    });
+
+    test('roundtrips through a signed Nostr event (kind 31501)', () {
+      final event = instance.toNostrEvent(
+        pubKey: farmPubkey,
+        createdAt: 1000,
+        farmPubkey: farmPubkey,
+      );
+      expect(event.kind, 31501);
+      expect(event.tags, [
+        ['d', '2026-07-31|milkers|morning-milking'],
+        ['role', 'milkers'],
+        ['date', '2026-07-31'],
+        ['farm', farmPubkey],
+      ]);
+      final decoded = ChoreInstance.fromNostrEvent(event);
+      expect(decoded.date, DateTime(2026, 7, 31));
+      expect(decoded.role, FarmRole.milkers);
+      expect(decoded.slug, 'morning-milking');
+      expect(decoded.title, 'Morning milking');
+      expect(decoded.type, ChoreType.chore);
+      expect(decoded.status, ChoreStatus.open);
+      expect(decoded.assignee, isNull);
+    });
+
+    test('roundtrips a done, deferred instance with assignee', () {
+      final done = instance
+          .copyWith(
+            status: ChoreStatus.deferred,
+            deferredTo: DateTime(2026, 8, 3),
+          )
+          .deferTo(DateTime(2026, 8, 3))
+          .copyWith(assignee: 'b' * 64);
+      final event = done.toNostrEvent(pubKey: farmPubkey, createdAt: 1);
+      final decoded = ChoreInstance.fromNostrEvent(event);
+      expect(decoded.status, ChoreStatus.deferred);
+      expect(decoded.deferredTo, DateTime(2026, 8, 3));
+      expect(decoded.assignee, 'b' * 64);
+    });
+
+    test('rejects events of other kinds', () {
+      final event = NostrEvent(pubKey: farmPubkey, createdAt: 1, kind: 31502);
+      expect(
+        () => ChoreInstance.fromNostrEvent(event),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('rejects an instance without a role tag', () {
+      final event = NostrEvent(
+        pubKey: farmPubkey,
+        createdAt: 1,
+        kind: 31501,
+        content: '{"title":"x","type":"chore","status":"open"}',
+        tags: [
+          ['d', '2026-07-31|milkers|morning-milking'],
+        ],
+      );
+      expect(
+        () => ChoreInstance.fromNostrEvent(event),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('rejects malformed content', () {
+      final event = NostrEvent(
+        pubKey: farmPubkey,
+        createdAt: 1,
+        kind: 31501,
+        content: 'not json',
+        tags: [
+          ['d', '2026-07-31|milkers|morning-milking'],
+          ['role', 'milkers'],
+          ['date', '2026-07-31'],
+        ],
+      );
+      expect(
+        () => ChoreInstance.fromNostrEvent(event),
+        throwsA(isA<FormatException>()),
+      );
     });
   });
 }
