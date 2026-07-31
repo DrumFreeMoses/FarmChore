@@ -1,11 +1,9 @@
-import 'dart:io';
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import 'events_table.dart';
+import 'open_database_web.dart'
+    if (dart.library.io) 'open_database_io.dart'
+    as dbopen;
 
 part 'app_database.g.dart';
 
@@ -18,16 +16,14 @@ class AppDatabase extends _$AppDatabase {
 
   AppDatabase.forTesting(super.e) : super();
 
-  /// Opens (or creates) the on-disk database in the app support directory.
+  /// Opens (or creates) the database. On the web, data lives in IndexedDB
+  /// via the sqlite3 WASM build; elsewhere in the app support directory.
   static Future<AppDatabase> open() async {
-    final dir = await getApplicationSupportDirectory();
-    final file = File(p.join(dir.path, 'farmchore.sqlite'));
-    return AppDatabase(LazyDatabase(() async => NativeDatabase(file)));
+    return AppDatabase(await dbopen.openExecutor());
   }
 
-  static Future<AppDatabase> openInMemory() async {
-    return AppDatabase(NativeDatabase.memory());
-  }
+  /// In-memory database for tests (native only).
+  static Future<AppDatabase> openInMemory() => dbopen.openInMemory();
 
   @override
   int get schemaVersion => 1;
