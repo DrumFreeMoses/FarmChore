@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:farm_chore/data/app_database.dart';
-import 'package:farm_chore/data/events_table.dart';
 
 void main() {
   group('AppDatabase schema v1', () {
