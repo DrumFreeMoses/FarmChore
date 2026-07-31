@@ -1,0 +1,27 @@
+app = "farmchore"
+primary_region = "den"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ADDR = ":8080"
+  DATABASE_PATH = "/data/farmchore.db"
+
+[[mounts]]
+  source = "data"
+  destination = "/data"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 1000
+    soft_limit = 100
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
