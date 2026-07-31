@@ -4,6 +4,8 @@ import 'package:farm_chore/data/demo_seed.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
+import 'package:farm_chore/widgets/chore_card.dart';
+import 'package:farm_chore/widgets/status_actions_sheet.dart';
 
 import 'role_chores_screen.dart';
 
@@ -84,33 +86,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.4,
-                    children: [
-                      for (final role in FarmRoles.all)
-                        _RoleCard(
-                          role: role,
-                          instances: _byRole[role]!,
-                          onTap: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => RoleChoresScreen(
-                                  repository: widget.repository,
-                                  role: role,
-                                  today: _today,
-                                ),
-                              ),
-                            );
-                            if (mounted) _refresh();
-                          },
+                  for (final role in FarmRoles.all) ...[
+                    _RoleHeader(
+                      role: role,
+                      instances: _byRole[role]!,
+                      onTap: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => RoleChoresScreen(
+                              repository: widget.repository,
+                              role: role,
+                              today: _today,
+                            ),
+                          ),
+                        );
+                        if (mounted) _refresh();
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    for (final instance in _byRole[role]!)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: ChoreCard(
+                          instance: instance,
+                          onTap: () => showStatusActions(
+                            context: context,
+                            repository: widget.repository,
+                            instance: instance,
+                            today: _today,
+                            onChanged: _refresh,
+                          ),
                         ),
-                    ],
-                  ),
+                      ),
+                    const SizedBox(height: 12),
+                  ],
                 ],
               ),
             ),
@@ -118,8 +127,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _RoleCard extends StatelessWidget {
-  const _RoleCard({
+class _RoleHeader extends StatelessWidget {
+  const _RoleHeader({
     required this.role,
     required this.instances,
     required this.onTap,
@@ -139,6 +148,7 @@ class _RoleCard extends StatelessWidget {
         : FarmColors.dawnAmber;
     return Card(
       elevation: 1,
+      margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: accent.withValues(alpha: 0.4)),
@@ -147,18 +157,18 @@ class _RoleCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
             children: [
-              Text(
-                role.displayName,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(color: FarmColors.soilBrown),
+              Expanded(
+                child: Text(
+                  role.displayName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(color: FarmColors.soilBrown),
+                ),
               ),
               if (total == 0)
                 Text(
@@ -183,11 +193,12 @@ class _RoleCard extends StatelessWidget {
                       '$done done',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 12),
                     Text(
                       '$open open',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                    const Icon(Icons.chevron_right, size: 18),
                   ],
                 ),
             ],

@@ -41,34 +41,39 @@ Future<ChoreRepository> seedRepository({Keys? keys, DateTime? today}) async {
 void main() {
   final friday = DateTime(2026, 7, 31);
 
-  testWidgets('dashboard shows per-role counts for today', (tester) async {
-    final repo = await seedRepository(today: friday);
-    addTearDown(repo.database.close);
+  Future<void> pumpDashboard(
+    WidgetTester tester,
+    ChoreRepository repo, {
+    DateTime? today,
+  }) async {
+    await tester.binding.setSurfaceSize(const Size(800, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
         theme: farmTheme(),
-        home: DashboardScreen(repository: repo, today: friday),
+        home: DashboardScreen(repository: repo, today: today ?? friday),
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('dashboard shows per-role counts for today', (tester) async {
+    final repo = await seedRepository(today: friday);
+    addTearDown(repo.database.close);
+    await pumpDashboard(tester, repo);
 
     expect(find.text("Milker's Chores"), findsOneWidget);
     expect(find.text("Feeder's Chores"), findsOneWidget);
     expect(find.text('3 open'), findsOneWidget);
     expect(find.text('0 done'), findsNWidgets(2));
     expect(find.text('No chores today'), findsNWidgets(4));
+    expect(find.text('Morning milking'), findsOneWidget);
   });
 
   testWidgets('tapping a role card drills into its chore list', (tester) async {
     final repo = await seedRepository(today: friday);
     addTearDown(repo.database.close);
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: farmTheme(),
-        home: DashboardScreen(repository: repo, today: friday),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await pumpDashboard(tester, repo);
 
     await tester.tap(find.text("Milker's Chores"));
     await tester.pumpAndSettle();
@@ -84,13 +89,7 @@ void main() {
   ) async {
     final repo = await seedRepository(today: friday);
     addTearDown(repo.database.close);
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: farmTheme(),
-        home: DashboardScreen(repository: repo, today: friday),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await pumpDashboard(tester, repo);
 
     await tester.tap(find.text("Milker's Chores"));
     await tester.pumpAndSettle();

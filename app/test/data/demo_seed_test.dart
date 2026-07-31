@@ -88,6 +88,8 @@ void main() {
     addTearDown(db.close);
     final repo = ChoreRepository(database: db, keys: Keys.generate());
 
+    await tester.binding.setSurfaceSize(const Size(800, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
         theme: farmTheme(),
@@ -105,6 +107,8 @@ void main() {
     expect(find.byTooltip('Load demo data'), findsNothing);
     expect(find.text("Milker's Chores"), findsOneWidget);
     expect(find.text('3 open'), findsOneWidget); // Pourers: 3 Friday chores
+    expect(find.text('Morning milking'), findsOneWidget);
+    expect(find.text('Bottle milk for shares'), findsOneWidget);
     expect(find.text('No chores today'), findsNothing);
   });
 }
