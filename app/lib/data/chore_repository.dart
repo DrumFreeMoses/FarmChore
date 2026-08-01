@@ -10,6 +10,7 @@ import '../domain/daily_generator.dart';
 import '../domain/edit_event.dart';
 import '../domain/heads_up.dart';
 import '../domain/member_profile.dart';
+import '../domain/notification_item.dart';
 import '../domain/role_default_set.dart';
 import '../domain/roles.dart';
 import '../nostr/nostr_event.dart';
@@ -508,5 +509,130 @@ class ChoreRepository {
           mode: InsertMode.insertOrReplace,
         );
     return true;
+  }
+
+  /// Loads notifications relevant to [myPubkey]: assignments to me, status
+  /// changes on my chores, and heads-ups for my roles or farm-wide.
+  Future<List<NotificationItem>> loadNotifications() async {
+    final all = await database.allEvents().get();
+    final myRoles = _myRoles();
+    final notifications = <NotificationItem>[];
+
+    for (final row in all) {
+      final event = _toNostr(row);
+      switch (row.kind) {
+        case assignmentKind:
+          final assignment = _parseAssignment(event);
+          if (assignment != null && assignment.assignee == myPubkey) {
+            notifications.add(
+              NotificationItem(
+                id: 'assign-${event.id}',
+                type: NotificationType.assigned,
+                title: 'Assigned to you',
+                body: 'New chore assignment',
+                timestamp: DateTime.fromMillisecondsSinceEpoch(
+                  event.createdAt * 1000,
+                ),
+                relatedInstanceId: assignment.instanceId,
+                role: _roleFromTags(event.tags),
+              ),
+            );
+          }
+        case editKind:
+          final edit = _parseEdit(event);
+          if (edit != null) {
+            final targetRow = all
+                .where(
+                  (r) =>
+                      r.kind == choreInstanceKind &&
+                      _dTag(r) == edit.instanceId,
+                )
+                .lastOrNull;
+            if (targetRow != null) {
+              final instance = ChoreInstance.fromNostrEvent(
+                _toNostr(targetRow),
+              );
+              if (instance.assignee == myPubkey) {
+                notifications.add(
+                  NotificationItem(
+                    id: 'edit-${event.id}',
+                    type: NotificationType.statusChange,
+                    title: 'Chore status changed',
+                    body: '${instance.title} → ${edit.field}: ${edit.value}',
+                    timestamp: DateTime.fromMillisecondsSinceEpoch(
+                      event.createdAt * 1000,
+                    ),
+                    relatedInstanceId: edit.instanceId,
+                    role: instance.role,
+                  ),
+                );
+              }
+            }
+          }
+        case headsUpKind:
+          final headsUp = HeadsUp.fromNostrEvent(event);
+          final scope = _scopeFromTags(event.tags);
+          if (scope == null || myRoles.contains(scope)) {
+            notifications.add(
+              NotificationItem(
+                id: 'heads-${event.id}',
+                type: NotificationType.headsUp,
+                title: 'Heads up',
+                body: headsUp.text,
+                timestamp: DateTime.fromMillisecondsSinceEpoch(
+                  event.createdAt * 1000,
+                ),
+                relatedInstanceId: event.id ?? '',
+                role: scope,
+              ),
+            );
+          }
+      }
+    }
+
+    notifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return notifications;
+  }
+
+  Set<FarmRole> _myRoles() {
+    final roles = <FarmRole>{};
+    // TODO: derive from assignments and defaults. For now, return all roles
+    // since every member is assumed to participate in farm life.
+    roles.addAll(FarmRole.values);
+    return roles;
+  }
+
+  FarmRole? _roleFromTags(List<List<String>> tags) {
+    for (final tag in tags) {
+      if (tag.length >= 2 && tag[0] == 'role') {
+        return FarmRole.fromIdOrNull(tag[1]);
+      }
+    }
+    return null;
+  }
+
+  FarmRole? _scopeFromTags(List<List<String>> tags) {
+    for (final tag in tags) {
+      if (tag.length >= 2 && tag[0] == 'scope') {
+        return FarmRole.fromIdOrNull(tag[1]);
+      }
+    }
+    return null;
+  }
+
+  Assignment? _parseAssignment(NostrEvent event) {
+    try {
+      return Assignment.fromNostrEvent(event);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  EditEvent? _parseEdit(NostrEvent event) {
+    try {
+      return EditEvent.fromNostrEvent(event);
+    } catch (_) {
+      return null;
+    }
   }
 }

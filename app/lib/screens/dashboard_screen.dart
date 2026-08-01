@@ -3,6 +3,7 @@ import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/data/demo_seed.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/roles.dart';
+import 'package:farm_chore/screens/notification_screen.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:farm_chore/widgets/chore_card.dart';
 import 'package:farm_chore/widgets/new_item_dialog.dart';
@@ -32,6 +33,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _loading = true;
   bool _hasDefaults = false;
   bool _gridMode = true;
+  int _unreadCount = 0;
 
   @override
   void initState() {
@@ -45,6 +47,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await widget.repository.ensureDayGenerated(_today);
     final instances = await widget.repository.loadInstancesForDate(_today);
     final names = await widget.repository.loadMemberNames();
+    final notifications = await widget.repository.loadNotifications();
     if (!mounted) return;
     setState(() {
       _hasDefaults = hasDefaults;
@@ -53,6 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         for (final role in FarmRoles.all)
           role: _workOrder(instances.where((i) => i.role == role).toList()),
       };
+      _unreadCount = notifications.where((n) => !n.read).length;
       _loading = false;
     });
   }
@@ -124,6 +128,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: Icon(_gridMode ? Icons.view_list : Icons.grid_view),
             tooltip: _gridMode ? 'Show list' : 'Show grid',
             onPressed: () => setState(() => _gridMode = !_gridMode),
+          ),
+          IconButton(
+            icon: Badge(
+              isLabelVisible: _unreadCount > 0,
+              label: Text('$_unreadCount'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            tooltip: 'Notifications',
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      NotificationScreen(repository: widget.repository),
+                ),
+              );
+              _refresh();
+            },
           ),
           IconButton(
             icon: const Icon(Icons.badge_outlined),
