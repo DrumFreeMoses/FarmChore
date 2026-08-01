@@ -10,6 +10,7 @@ import 'package:farm_chore/widgets/chore_card.dart';
 import 'package:farm_chore/widgets/new_item_dialog.dart';
 import 'package:farm_chore/widgets/role_section_header.dart';
 import 'package:farm_chore/widgets/status_actions_sheet.dart';
+import 'package:farm_chore/widgets/sync_status_badge.dart';
 
 import 'role_chores_screen.dart';
 
@@ -119,6 +120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: const Text('FarmChore'),
         actions: [
+          SyncStatusBadge(repository: widget.repository, onSync: _refresh),
           if (!_hasDefaults)
             IconButton(
               icon: const Icon(Icons.agriculture),
