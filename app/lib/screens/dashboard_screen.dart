@@ -3,6 +3,7 @@ import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/data/demo_seed.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/roles.dart';
+import 'package:farm_chore/screens/morning_meeting_screen.dart';
 import 'package:farm_chore/screens/notification_screen.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:farm_chore/widgets/chore_card.dart';
@@ -128,6 +129,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: Icon(_gridMode ? Icons.view_list : Icons.grid_view),
             tooltip: _gridMode ? 'Show list' : 'Show grid',
             onPressed: () => setState(() => _gridMode = !_gridMode),
+          ),
+          IconButton(
+            icon: const Icon(Icons.groups),
+            tooltip: 'Morning meeting',
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => MorningMeetingScreen(
+                    repository: widget.repository,
+                    myPubkey: widget.repository.myPubkey,
+                  ),
+                ),
+              );
+              _refresh();
+            },
           ),
           IconButton(
             icon: Badge(

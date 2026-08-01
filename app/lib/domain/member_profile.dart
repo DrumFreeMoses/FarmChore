@@ -5,18 +5,36 @@ import '../nostr/nostr_event.dart';
 /// Kind for a member's display name (addressable by pubkey).
 const int memberProfileKind = 31504;
 
-/// A member's chosen display name (kind 31504, `d` = pubkey).
+/// A member's profile (kind 31504, `d` = pubkey).
 ///
 /// Anyone can read all profiles; only the owner's own pubkey signs theirs,
 /// so a profile only counts for the pubkey that signed it.
 class MemberProfile {
-  const MemberProfile({required this.pubkey, required this.name});
+  const MemberProfile({
+    required this.pubkey,
+    required this.name,
+    this.dayOff,
+    this.skills = const [],
+  });
 
   final String pubkey;
   final String name;
 
+  /// Weekday off (1=Monday .. 6=Saturday), or null for no regular day off.
+  final int? dayOff;
+
+  /// Skill tags this member has (e.g. `milker`, `skid-loader`, `tractor`).
+  final List<String> skills;
+
   /// Canonical addressable id: the member pubkey.
   String get dTag => pubkey;
+
+  /// True when [member] has all [requiredSkills].
+  bool hasSkills(List<String> requiredSkills) =>
+      requiredSkills.every((s) => skills.contains(s));
+
+  /// True when this member is off on [weekday].
+  bool isOffOn(int weekday) => dayOff == weekday;
 
   NostrEvent toNostrEvent({
     required String pubKey,
@@ -33,7 +51,11 @@ class MemberProfile {
         if (farmPubkey != null) ['farm', farmPubkey],
         ...extraTags,
       ],
-      content: jsonEncode({'name': name}),
+      content: jsonEncode({
+        'name': name,
+        if (dayOff != null) 'dayOff': dayOff,
+        if (skills.isNotEmpty) 'skills': skills,
+      }),
     );
   }
 
@@ -55,6 +77,25 @@ class MemberProfile {
     if (name is! String || name.isEmpty) {
       throw const FormatException('member profile needs a name');
     }
-    return MemberProfile(pubkey: dTag, name: name);
+    final dayOff = decoded['dayOff'] as int?;
+    final skills = (decoded['skills'] as List?)?.cast<String>() ?? const [];
+    return MemberProfile(
+      pubkey: dTag,
+      name: name,
+      dayOff: dayOff,
+      skills: skills,
+    );
   }
+
+  MemberProfile copyWith({
+    String? name,
+    int? dayOff,
+    bool clearDayOff = false,
+    List<String>? skills,
+  }) => MemberProfile(
+    pubkey: pubkey,
+    name: name ?? this.name,
+    dayOff: clearDayOff ? null : (dayOff ?? this.dayOff),
+    skills: skills ?? this.skills,
+  );
 }

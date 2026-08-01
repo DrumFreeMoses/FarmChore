@@ -12,6 +12,7 @@ class ChoreDefault {
     required this.title,
     required this.weekdays,
     this.assigneeHint,
+    this.requiredSkills = const [],
   });
 
   final String title;
@@ -20,18 +21,25 @@ class ChoreDefault {
   final List<int> weekdays;
   final String? assigneeHint;
 
+  /// Skill tags required to perform this chore (e.g. `milker`, `skid-loader`).
+  /// Empty means no skill requirement.
+  final List<String> requiredSkills;
+
   bool runsOnWeekday(DateTime date) => weekdays.contains(date.weekday);
 
-  ChoreDefault copyWith({String? assigneeHint}) => ChoreDefault(
-    title: title,
-    weekdays: weekdays,
-    assigneeHint: assigneeHint ?? this.assigneeHint,
-  );
+  ChoreDefault copyWith({String? assigneeHint, List<String>? requiredSkills}) =>
+      ChoreDefault(
+        title: title,
+        weekdays: weekdays,
+        assigneeHint: assigneeHint ?? this.assigneeHint,
+        requiredSkills: requiredSkills ?? this.requiredSkills,
+      );
 
   Map<String, dynamic> toJson() => {
     'title': title,
     'weekdays': weekdays,
     if (assigneeHint != null) 'assigneeHint': assigneeHint,
+    if (requiredSkills.isNotEmpty) 'requiredSkills': requiredSkills,
   };
 
   factory ChoreDefault.fromJson(Map<String, dynamic> json) {
@@ -49,10 +57,13 @@ class ChoreDefault {
         'weekdays must be 1=Monday..6=Saturday (Sunday rest)',
       );
     }
+    final requiredSkills =
+        (json['requiredSkills'] as List?)?.cast<String>() ?? const [];
     return ChoreDefault(
       title: title,
       weekdays: parsed,
       assigneeHint: json['assigneeHint'] as String?,
+      requiredSkills: requiredSkills,
     );
   }
 }

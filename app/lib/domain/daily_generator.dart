@@ -1,4 +1,5 @@
 import 'chore_instance.dart';
+import 'member_profile.dart';
 import 'role_default_set.dart';
 
 /// Turns role default sets (kind 31500) into today's chore instances
@@ -6,15 +7,36 @@ import 'role_default_set.dart';
 abstract final class DailyGenerator {
   /// Generates open instances for [date] from each default that runs on
   /// that weekday. Sundays generate nothing (the farm rests).
+  ///
+  /// When [members] is provided, auto-assigns chores to the hint member
+  /// only if they are qualified (have required skills) and available (not
+  /// on their day off). Unqualified or unavailable chores stay unassigned
+  /// for the morning meeting.
   static List<ChoreInstance> generate({
     required List<RoleDefaultSet> defaults,
     required DateTime date,
+    List<MemberProfile> members = const [],
   }) {
+    final memberMap = {for (final m in members) m.pubkey: m};
     final instances = <ChoreInstance>[];
     for (final set in defaults) {
       for (final chore in set.chores) {
         if (!chore.runsOnWeekday(date)) {
           continue;
+        }
+        String? assignee;
+        if (chore.assigneeHint != null) {
+          if (members.isEmpty) {
+            // No member data — carry the hint as-is (backward compatible).
+            assignee = chore.assigneeHint;
+          } else {
+            final member = memberMap[chore.assigneeHint];
+            if (member != null &&
+                !member.isOffOn(date.weekday) &&
+                member.hasSkills(chore.requiredSkills)) {
+              assignee = chore.assigneeHint;
+            }
+          }
         }
         instances.add(
           ChoreInstance(
@@ -22,7 +44,7 @@ abstract final class DailyGenerator {
             role: set.role,
             slug: slugify(chore.title),
             title: chore.title,
-            assignee: chore.assigneeHint,
+            assignee: assignee,
           ),
         );
       }

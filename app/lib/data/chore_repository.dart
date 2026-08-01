@@ -184,6 +184,22 @@ class ChoreRepository {
     };
   }
 
+  /// All known member profiles (latest profile per member wins).
+  Future<List<MemberProfile>> loadAllMembers() async {
+    final rows = await database.eventsForKind(memberProfileKind).get();
+    final latest = <String, Event>{};
+    for (final row in rows) {
+      final profile = MemberProfile.fromNostrEvent(_toNostr(row));
+      final current = latest[profile.pubkey];
+      if (current == null || row.createdAt > current.createdAt) {
+        latest[profile.pubkey] = row;
+      }
+    }
+    return latest.values
+        .map((row) => MemberProfile.fromNostrEvent(_toNostr(row)))
+        .toList();
+  }
+
   /// Posts a heads-up notice for the farm or one role group (kind 31505).
   Future<void> saveHeadsUp(String text, {FarmRole? scope}) async {
     final now = _now();
@@ -251,7 +267,12 @@ class ChoreRepository {
   /// of new instances created.
   Future<int> ensureDayGenerated(DateTime date) async {
     final defaults = await loadBaseRoleDefaultSets();
-    final generated = DailyGenerator.generate(defaults: defaults, date: date);
+    final members = await loadAllMembers();
+    final generated = DailyGenerator.generate(
+      defaults: defaults,
+      date: date,
+      members: members,
+    );
     final existing = await loadInstancesForDate(date);
     final existingTags = existing.map((i) => i.dTag).toSet();
     var created = 0;
