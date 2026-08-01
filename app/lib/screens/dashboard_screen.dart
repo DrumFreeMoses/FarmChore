@@ -3,6 +3,7 @@ import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/data/demo_seed.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/roles.dart';
+import 'package:farm_chore/screens/invite_screen.dart';
 import 'package:farm_chore/screens/morning_meeting_screen.dart';
 import 'package:farm_chore/screens/notification_screen.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
@@ -168,6 +169,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: const Icon(Icons.badge_outlined),
             tooltip: 'Your name',
             onPressed: _editName,
+          ),
+          IconButton(
+            icon: const Icon(Icons.qr_code),
+            tooltip: 'Invite via QR',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => InviteScreen(
+                    relayUrl: const String.fromEnvironment(
+                      'FARMCHORE_RELAY',
+                      defaultValue: 'ws://localhost:7447',
+                    ),
+                    farmPubkey:
+                        widget.repository.farmPubkey ??
+                        widget.repository.myPubkey,
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),

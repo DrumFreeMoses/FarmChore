@@ -37,7 +37,9 @@ void main() {
       expect(find.byIcon(Icons.cloud_upload_outlined), findsNothing);
     });
 
-    testWidgets('shows badge with count when events are pending', (tester) async {
+    testWidgets('shows badge with count when events are pending', (
+      tester,
+    ) async {
       final instance = ChoreInstance(
         date: DateTime(2026, 7, 31),
         role: FarmRole.milkers,
