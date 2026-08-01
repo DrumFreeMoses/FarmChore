@@ -1,4 +1,3 @@
-import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/daily_generator.dart';
 import 'package:farm_chore/domain/member_profile.dart';
 import 'package:farm_chore/domain/role_default_set.dart';

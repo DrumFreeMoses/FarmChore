@@ -209,6 +209,75 @@ void main() {
       expect(instances.single.title, 'New');
     });
   });
+
+  group('SyncService live subscription', () {
+    test('receives pushed events and fires onRemoteEvents', () async {
+      final remote = _signedEvent(
+        kind: 31501,
+        content: '{"title":"Remote milking","status":"open","type":"chore"}',
+        tags: [
+          ['d', '2026-07-31|milkers|milking-am'],
+          ['role', 'milkers'],
+          ['date', '2026-07-31'],
+        ],
+      );
+
+      final fake = FakeRelay();
+      final sync = SyncService(repository: repo, connectionFactory: () => fake);
+
+      final events = <void>[];
+      sync.onRemoteEvents.listen((_) => events.add(null));
+
+      sync.startLiveSubscription();
+      // Wait for the connection to establish and REQ to be sent.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      // Relay pushes an event.
+      fake.pushEvent(remote);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(events, hasLength(1));
+      final instances = await repo.loadInstancesForDate(DateTime(2026, 7, 31));
+      expect(instances.length, 1);
+      expect(instances.single.title, 'Remote milking');
+
+      await sync.stopLiveSubscription();
+    });
+
+    test('isLive reports connection state', () async {
+      final fake = FakeRelay();
+      final sync = SyncService(repository: repo, connectionFactory: () => fake);
+
+      expect(sync.isLive, isFalse);
+      sync.startLiveSubscription();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(sync.isLive, isTrue);
+      await sync.stopLiveSubscription();
+      expect(sync.isLive, isFalse);
+    });
+
+    test('stopLiveSubscription cleans up resources', () async {
+      final fake = FakeRelay();
+      final sync = SyncService(repository: repo, connectionFactory: () => fake);
+
+      sync.startLiveSubscription();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await sync.stopLiveSubscription();
+
+      // After stop, pushing events should not crash.
+      fake.pushEvent(
+        _signedEvent(
+          kind: 31501,
+          content: '{}',
+          tags: [
+            ['d', 'test'],
+          ],
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      // No crash = pass.
+    });
+  });
 }
 
 Map<String, Object?> _signedEvent({
@@ -273,6 +342,11 @@ class FakeRelay implements RelayConnection {
       }
       _incoming.add(['EOSE', message[1]]);
     }
+  }
+
+  /// Push an event from the relay side (simulates another device publishing).
+  void pushEvent(Map<String, Object?> event) {
+    _incoming.add(['EVENT', 'live-sub', event]);
   }
 
   @override

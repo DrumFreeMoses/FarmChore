@@ -44,6 +44,7 @@ class _Bootstrap extends StatefulWidget {
 
 class _BootstrapState extends State<_Bootstrap> {
   Timer? _syncTimer;
+  SyncService? _sync;
   late final Future<_Session> _session = _open();
 
   Future<_Session> _open() async {
@@ -54,18 +55,23 @@ class _BootstrapState extends State<_Bootstrap> {
       repository: repository,
       connectionFactory: () => WebSocketRelayConnection(_relayUrl),
     );
-    // Mirror the relay at startup and keep a background heartbeat running.
+    _sync = sync;
+    // One-shot sync at startup.
     unawaited(sync.sync());
+    // Keep a 1-minute fallback timer for pending push retries.
     _syncTimer = Timer.periodic(
       const Duration(minutes: 1),
       (_) => unawaited(sync.sync()),
     );
+    // Live subscription for real-time updates from other devices.
+    sync.startLiveSubscription();
     return _Session(repository: repository, myPubkey: identity.pubkey);
   }
 
   @override
   void dispose() {
     _syncTimer?.cancel();
+    _sync?.stopLiveSubscription();
     super.dispose();
   }
 

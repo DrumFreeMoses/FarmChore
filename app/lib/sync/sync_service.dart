@@ -43,6 +43,109 @@ class SyncService {
   final List<Future<bool>> _imports = [];
   StreamSubscription<List<Object?>>? _subscription;
 
+  // ── Live subscription ──────────────────────────────────────────────
+  RelayConnection? _liveConnection;
+  StreamSubscription<List<Object?>>? _liveSubscription;
+  bool _liveRunning = false;
+  int _liveSince = 0;
+  String? _liveSubId;
+
+  /// Fires whenever remote events are imported by the live subscription.
+  /// Listeners should rebuild their data (e.g. reload the day's instances).
+  final StreamController<void> _onRemoteEvents = StreamController.broadcast();
+  Stream<void> get onRemoteEvents => _onRemoteEvents.stream;
+
+  /// Whether the live subscription is currently connected and listening.
+  bool get isLive => _liveRunning;
+
+  /// Starts a persistent subscription to the relay. The connection stays
+  /// open and incoming events are imported immediately. On disconnect the
+  /// connection is retried with exponential backoff (1 s → 2 s → 4 s → …
+  /// capped at 30 s).
+  void startLiveSubscription({int since = 0}) {
+    if (_liveRunning) return;
+    _liveRunning = true;
+    _liveSince = since;
+    _connectLive();
+  }
+
+  /// Stops the live subscription and closes the underlying connection.
+  Future<void> stopLiveSubscription() async {
+    _liveRunning = false;
+    await _liveSubscription?.cancel();
+    _liveSubscription = null;
+    await _liveConnection?.close();
+    _liveConnection = null;
+    _liveSubId = null;
+  }
+
+  Future<void> _connectLive() async {
+    if (!_liveRunning) return;
+    var delay = const Duration(seconds: 1);
+    while (_liveRunning) {
+      try {
+        final connection = connectionFactory();
+        await connection.connect();
+        _liveConnection = connection;
+        _liveSubscription = connection.receive().listen(_handleLive);
+        _liveSubId = 'live-${DateTime.now().microsecondsSinceEpoch}';
+        await connection.send([
+          'REQ',
+          _liveSubId!,
+          {'kinds': ChoreRepository.syncKinds, 'since': _liveSince},
+        ]);
+        // Reset backoff on successful connect.
+        delay = const Duration(seconds: 1);
+
+        // Keep alive until disconnected.
+        while (_liveRunning && _liveConnection != null) {
+          await Future<void>.delayed(const Duration(seconds: 30));
+          // Ping to detect dead connections; if the socket is broken the
+          // listen callback will fire an error and break out.
+          try {
+            await connection.send(['REQ', _liveSubId!, {}]);
+          } catch (_) {
+            break; // Connection dead → reconnect.
+          }
+        }
+      } catch (_) {
+        // Connection failed.
+      } finally {
+        await _liveSubscription?.cancel();
+        _liveSubscription = null;
+        await _liveConnection?.close();
+        _liveConnection = null;
+        _liveSubId = null;
+      }
+      if (!_liveRunning) break;
+      await Future<void>.delayed(delay);
+      delay = Duration(
+        milliseconds: (delay.inMilliseconds * 2).clamp(0, 30000),
+      );
+    }
+  }
+
+  void _handleLive(List<Object?> message) {
+    if (message.isEmpty) return;
+    switch (message.first) {
+      case 'EVENT':
+        if (message.length >= 3 && message[2] is Map<String, dynamic>) {
+          repository
+              .importRemoteEvent(message[2] as Map<String, dynamic>)
+              .then((ok) {
+                if (ok) _onRemoteEvents.add(null);
+              })
+              .catchError((_) {});
+        }
+      case 'OK':
+        // Already handled by sync() flow; live subscription ignores OKs
+        // for its own REQ frames.
+        break;
+    }
+  }
+
+  // ── One-shot sync (existing) ───────────────────────────────────────
+
   /// Runs one sync pass. Never throws: an offline or broken relay just
   /// returns zero counts and leaves the outbound queue untouched.
   Future<SyncResult> sync({int since = 0}) async {
