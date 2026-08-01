@@ -453,4 +453,60 @@ class ChoreRepository {
         .map((t) => (t as List).cast<String>())
         .toList(),
   );
+
+  /// The FarmChore kinds mirrored to the relay.
+  static const List<int> syncKinds = [
+    roleDefaultSetKind,
+    choreInstanceKind,
+    assignmentKind,
+    editKind,
+    memberProfileKind,
+    headsUpKind,
+  ];
+
+  /// Events still queued for the relay.
+  Future<List<Event>> pendingEvents() => database.pendingEvents().get();
+
+  /// Marks an event as acknowledged by the relay (or a settled duplicate).
+  Future<void> markSent(String eventId) async {
+    await (database.update(database.events)..where((e) => e.id.equals(eventId)))
+        .write(const EventsCompanion(sent: Value(true)));
+  }
+
+  /// Imports a remote event into the local log.
+  ///
+  /// Rejects events whose kind is not part of the farm sync set, whose id
+  /// does not match its canonical serialization, or whose signature does not
+  /// verify. Returns true when the event was stored.
+  Future<bool> importRemoteEvent(Map<String, dynamic> json) async {
+    final kind = json['kind'];
+    if (kind is! int || !syncKinds.contains(kind)) return false;
+    final event = NostrEvent(
+      id: json['id'] as String?,
+      pubKey: (json['pubkey'] as String?) ?? '',
+      createdAt: (json['created_at'] as num?)?.toInt() ?? 0,
+      kind: kind,
+      tags: ((json['tags'] as List?) ?? const [])
+          .map((t) => (t as List).cast<String>())
+          .toList(),
+      content: (json['content'] as String?) ?? '',
+      sig: json['sig'] as String?,
+    );
+    if (!event.verifySignature()) return false;
+    await database
+        .into(database.events)
+        .insert(
+          EventsCompanion.insert(
+            id: event.idOrComputed,
+            pubkey: event.pubKey,
+            kind: event.kind,
+            createdAt: event.createdAt,
+            content: event.content,
+            sig: Value(event.sig ?? ''),
+            tags: Value(jsonEncode(event.tags)),
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
+    return true;
+  }
 }

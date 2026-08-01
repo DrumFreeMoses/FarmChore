@@ -1,10 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:farm_chore/data/app_database.dart';
 import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/identity/key_storage.dart';
 import 'package:farm_chore/identity/identity_service.dart';
 import 'package:farm_chore/screens/home_shell.dart';
+import 'package:farm_chore/sync/relay_connection.dart';
+import 'package:farm_chore/sync/sync_service.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
+
+/// Relay URL. Override at build time:
+///   flutter run --dart-define=FARMCHORE_RELAY=ws://relay.farm.example
+const String _relayUrl = String.fromEnvironment(
+  'FARMCHORE_RELAY',
+  defaultValue: 'ws://localhost:7447',
+);
 
 void main() {
   runApp(const FarmChoreApp());
@@ -32,15 +43,30 @@ class _Bootstrap extends StatefulWidget {
 }
 
 class _BootstrapState extends State<_Bootstrap> {
+  Timer? _syncTimer;
   late final Future<_Session> _session = _open();
 
   Future<_Session> _open() async {
     final identity = await IdentityService(SecureKeyStorage()).ensureIdentity();
     final database = await AppDatabase.open();
-    return _Session(
-      repository: ChoreRepository(database: database, keys: identity.keys),
-      myPubkey: identity.pubkey,
+    final repository = ChoreRepository(database: database, keys: identity.keys);
+    final sync = SyncService(
+      repository: repository,
+      connectionFactory: () => WebSocketRelayConnection(_relayUrl),
     );
+    // Mirror the relay at startup and keep a background heartbeat running.
+    unawaited(sync.sync());
+    _syncTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => unawaited(sync.sync()),
+    );
+    return _Session(repository: repository, myPubkey: identity.pubkey);
+  }
+
+  @override
+  void dispose() {
+    _syncTimer?.cancel();
+    super.dispose();
   }
 
   @override
