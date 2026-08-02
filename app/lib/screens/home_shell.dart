@@ -3,6 +3,7 @@ import 'package:farm_chore/data/chore_repository.dart';
 
 import 'dashboard_screen.dart';
 import 'history_screen.dart';
+import 'message_screen.dart';
 import 'my_chores_screen.dart';
 import 'news_screen.dart';
 import 'undone_chores_screen.dart';
@@ -39,6 +40,7 @@ class _HomeShellState extends State<HomeShell> {
       UndoneChoresScreen(repository: widget.repository, today: widget.today),
       HistoryScreen(repository: widget.repository, today: widget.today),
       NewsScreen(repository: widget.repository),
+      MessageScreen(repository: widget.repository, myPubkey: widget.myPubkey),
     ];
     return Scaffold(
       body: IndexedStack(index: _index, children: screens),
@@ -54,6 +56,7 @@ class _HomeShellState extends State<HomeShell> {
           ),
           NavigationDestination(icon: Icon(Icons.history), label: 'History'),
           NavigationDestination(icon: Icon(Icons.campaign), label: 'News'),
+          NavigationDestination(icon: Icon(Icons.message), label: 'Messages'),
         ],
       ),
     );

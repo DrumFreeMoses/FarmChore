@@ -8,6 +8,7 @@ import '../domain/assignment.dart';
 import '../domain/chore_instance.dart';
 import '../domain/daily_generator.dart';
 import '../domain/edit_event.dart';
+import '../domain/farm_message.dart';
 import '../domain/heads_up.dart';
 import '../domain/member_profile.dart';
 import '../domain/notification_item.dart';
@@ -211,6 +212,40 @@ class ChoreRepository {
         scope: scope,
       ).toNostrEvent(pubKey: myPubkey, createdAt: now, farmPubkey: farmPubkey),
     );
+  }
+
+  /// Sends a farm message: broadcast (null recipient) or DM (recipient pubkey).
+  Future<void> sendMessage(String text, {String? recipient}) async {
+    final now = _now();
+    await _persist(
+      FarmMessage(
+        text: text,
+        author: myPubkey,
+        createdAt: now,
+        recipient: recipient,
+      ).toNostrEvent(pubKey: myPubkey, createdAt: now, farmPubkey: farmPubkey),
+    );
+  }
+
+  /// All farm messages, newest first. LWW by createdAt per d tag.
+  Future<List<FarmMessage>> loadMessages() async {
+    final rows = await database.eventsForKind(farmMessageKind).get();
+    final latest = <String, Event>{};
+    for (final row in rows) {
+      final key = _dTag(row) ?? row.id;
+      final current = latest[key];
+      if (current == null ||
+          row.createdAt > current.createdAt ||
+          (row.createdAt == current.createdAt &&
+              row.id.compareTo(current.id) > 0)) {
+        latest[key] = row;
+      }
+    }
+    final messages = latest.values.map(
+      (r) => FarmMessage.fromNostrEvent(_toNostr(r)),
+    );
+    return messages.toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   }
 
   /// All heads-ups, newest first. Only the latest event per author+time
@@ -484,6 +519,7 @@ class ChoreRepository {
     editKind,
     memberProfileKind,
     headsUpKind,
+    farmMessageKind,
   ];
 
   /// Events still queued for the relay.
