@@ -69,7 +69,7 @@ class _MorningMeetingScreenState extends State<MorningMeetingScreen> {
                   '$_remaining remaining',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: _remaining == 0
-                        ? Colors.green
+                        ? FarmColors.success
                         : Theme.of(context).colorScheme.primary,
                   ),
                 ),
@@ -82,7 +82,7 @@ class _MorningMeetingScreenState extends State<MorningMeetingScreen> {
                 child: Text(
                   'All done!',
                   style: TextStyle(
-                    color: Colors.green,
+                    color: FarmColors.success,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -130,7 +130,7 @@ class _MorningMeetingScreenState extends State<MorningMeetingScreen> {
                     _SectionHeader(
                       title: 'Done',
                       count: _done.length,
-                      color: Colors.green,
+                      color: FarmColors.success,
                     ),
                     for (final instance in _done)
                       _MeetingChoreTile(
@@ -226,7 +226,7 @@ class _MeetingChoreTile extends StatelessWidget {
         style: Theme.of(context).textTheme.bodySmall,
       ),
       trailing: instance.status.isDone
-          ? const Icon(Icons.check_circle, color: Colors.green)
+          ? const Icon(Icons.check_circle, color: FarmColors.success)
           : instance.status.isRemaining
           ? IconButton(
               icon: const Icon(Icons.touch_app),

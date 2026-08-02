@@ -85,10 +85,7 @@ void main() {
         recipient: 'key456',
       );
 
-      final event = msg.toNostrEvent(
-        pubKey: 'key123',
-        createdAt: 1700000000,
-      );
+      final event = msg.toNostrEvent(pubKey: 'key123', createdAt: 1700000000);
       final parsed = FarmMessage.fromNostrEvent(event);
 
       expect(parsed.text, 'Hello farm!');
@@ -103,10 +100,7 @@ void main() {
         createdAt: 1700000000,
       );
 
-      final event = msg.toNostrEvent(
-        pubKey: 'key123',
-        createdAt: 1700000000,
-      );
+      final event = msg.toNostrEvent(pubKey: 'key123', createdAt: 1700000000);
       final parsed = FarmMessage.fromNostrEvent(event);
 
       expect(parsed.text, 'Farm update');
@@ -147,12 +141,11 @@ void main() {
 
   group('MessageScreen widget', () {
     testWidgets('shows empty state when no messages', (tester) async {
-      await tester.pumpWidget(MaterialApp(
-        home: MessageScreen(
-          repository: repo,
-          myPubkey: keys.public,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MessageScreen(repository: repo, myPubkey: keys.public),
         ),
-      ));
+      );
       await tester.pump();
 
       expect(find.text('No messages yet. Say hello!'), findsOneWidget);
@@ -161,12 +154,11 @@ void main() {
     testWidgets('shows farm-wide in inbox', (tester) async {
       await repo.sendMessage('Farm update');
 
-      await tester.pumpWidget(MaterialApp(
-        home: MessageScreen(
-          repository: repo,
-          myPubkey: keys.public,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MessageScreen(repository: repo, myPubkey: keys.public),
         ),
-      ));
+      );
       await tester.pump();
 
       expect(find.text('Farm-wide'), findsOneWidget);

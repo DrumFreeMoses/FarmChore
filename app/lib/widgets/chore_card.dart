@@ -171,7 +171,9 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onColor = label == 'Skipped' ? FarmColors.soilBrown : Colors.white;
+    final onColor = label == 'Skipped'
+        ? FarmColors.soilBrown
+        : FarmColors.surface;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(

@@ -51,7 +51,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.notifications_none, size: 64, color: Colors.grey),
+                  Icon(
+                    Icons.notifications_none,
+                    size: 64,
+                    color: FarmColors.sabbath,
+                  ),
                   SizedBox(height: 16),
                   Text('No notifications yet'),
                 ],
@@ -114,7 +118,7 @@ class _NotificationTile extends StatelessWidget {
   }
 
   Widget _iconForType(NotificationType type, FarmRole? role) {
-    final color = role != null ? roleAccent(role) : Colors.grey;
+    final color = role != null ? roleAccent(role) : FarmColors.sabbath;
     final icon = switch (type) {
       NotificationType.assigned => Icons.person_add,
       NotificationType.statusChange => Icons.edit_note,

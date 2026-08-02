@@ -251,7 +251,7 @@ class _ConversationTile extends StatelessWidget {
             : FarmColors.springBlue,
         child: Icon(
           isFarmWide ? Icons.campaign : Icons.person,
-          color: Colors.white,
+          color: FarmColors.surface,
           size: 20,
         ),
       ),
@@ -279,8 +279,8 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final align = isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-    final bg = isMine ? FarmColors.cottonwoodGreen : Colors.grey.shade200;
-    final fg = isMine ? Colors.white : Colors.black87;
+    final bg = isMine ? FarmColors.cottonwoodGreen : FarmColors.surfaceVariant;
+    final fg = isMine ? FarmColors.surface : FarmColors.onSurface;
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -337,8 +337,8 @@ class _ComposeBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(top: BorderSide(color: Colors.grey.shade300)),
+        color: FarmColors.surface,
+        border: Border(top: BorderSide(color: FarmColors.outlineVariant)),
       ),
       child: SafeArea(
         top: false,
@@ -353,12 +353,12 @@ class _ComposeBar extends StatelessWidget {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: FarmColors.surfaceVariant,
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Text(
                     'Type a message…',
-                    style: TextStyle(color: Colors.grey.shade500),
+                    style: TextStyle(color: FarmColors.sabbath),
                   ),
                 ),
               ),

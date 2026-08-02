@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 /// Displays a QR code that encodes the relay URL and farm pubkey so new
@@ -39,11 +40,11 @@ class InviteScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: FarmColors.surface,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
+                    color: FarmColors.soilBrown.withValues(alpha: 0.1),
                     blurRadius: 8,
                   ),
                 ],
@@ -52,7 +53,7 @@ class InviteScreen extends StatelessWidget {
                 data: _qrData,
                 version: QrVersions.auto,
                 size: 220,
-                backgroundColor: Colors.white,
+                backgroundColor: FarmColors.surface,
               ),
             ),
             const SizedBox(height: 24),
