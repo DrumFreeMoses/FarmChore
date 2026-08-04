@@ -42,10 +42,26 @@ class _RoleChoresScreenState extends State<RoleChoresScreen> {
   Future<void> _refresh() async {
     final all = await widget.repository.loadInstancesForDate(_today);
     final names = await widget.repository.loadMemberNames();
+    // Load default order.
+    final bases = await widget.repository.loadBaseRoleDefaultSets();
+    final baseSet = bases.where((s) => s.role == widget.role).firstOrNull;
+    final defaultOrder = {
+      for (int i = 0; i < (baseSet?.chores.length ?? 0); i++)
+        baseSet!.chores[i].title: i,
+    };
     if (!mounted) return;
+    final instances = all.where((i) => i.role == widget.role).toList();
+    // Sort: open first, then by default order, then done last.
+    instances.sort((a, b) {
+      if (a.status.isRemaining && !b.status.isRemaining) return -1;
+      if (!a.status.isRemaining && b.status.isRemaining) return 1;
+      final orderA = defaultOrder[a.title] ?? 999;
+      final orderB = defaultOrder[b.title] ?? 999;
+      return orderA.compareTo(orderB);
+    });
     setState(() {
       _names = names;
-      _instances = all.where((i) => i.role == widget.role).toList();
+      _instances = instances;
       _loading = false;
     });
   }

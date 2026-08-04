@@ -113,10 +113,15 @@ void main() {
 
     expect(find.text('Bottle milk'), findsOneWidget);
 
-    // Add a chore.
+    // Add a chore (title + description + checklist are mandatory).
     await tester.tap(find.text('Add chore'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Ice the milk');
+    // Fill title (first TextField).
+    await tester.enterText(find.byType(TextField).first, 'Ice the milk');
+    // Fill description (second TextField).
+    await tester.enterText(find.byType(TextField).at(1), 'Cool the milk quickly after milking');
+    // Fill first checklist item (third TextField).
+    await tester.enterText(find.byType(TextField).at(2), 'Check ice level');
     await tester.tap(find.text('Add'));
     await tester.pumpAndSettle();
     expect(find.text('Ice the milk'), findsOneWidget);

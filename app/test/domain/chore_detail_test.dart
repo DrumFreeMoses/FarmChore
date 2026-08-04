@@ -32,8 +32,10 @@ void main() {
       final json = chore.toJson();
       final parsed = ChoreDefault.fromJson(json);
 
-      expect(parsed.description,
-          'Connect the milking equipment and sanitize teats.');
+      expect(
+        parsed.description,
+        'Connect the milking equipment and sanitize teats.',
+      );
       expect(parsed.checklist, ['Check equipment', 'Sanitize', 'Attach cups']);
     });
 
@@ -97,20 +99,14 @@ void main() {
       const base = RoleDefaultSet(
         role: FarmRole.milkers,
         chores: [
-          ChoreDefault(
-              title: 'Morning milking', weekdays: [1, 2, 3, 4, 5, 6]),
+          ChoreDefault(title: 'Morning milking', weekdays: [1, 2, 3, 4, 5, 6]),
         ],
       );
       await repo.saveRoleDefaultSet(base);
 
-      await repo.saveChoreSet(
-        FarmRole.milkers,
-        'Rainy day',
-        const [
-          ChoreDefault(
-              title: 'Indoor cleaning', weekdays: [1, 2, 3, 4, 5, 6]),
-        ],
-      );
+      await repo.saveChoreSet(FarmRole.milkers, 'Rainy day', const [
+        ChoreDefault(title: 'Indoor cleaning', weekdays: [1, 2, 3, 4, 5, 6]),
+      ]);
 
       final sets = await repo.loadChoreSets(FarmRole.milkers);
       expect(sets.length, 1);
@@ -121,8 +117,7 @@ void main() {
       const base = RoleDefaultSet(
         role: FarmRole.milkers,
         chores: [
-          ChoreDefault(
-              title: 'Morning milking', weekdays: [1, 2, 3, 4, 5, 6]),
+          ChoreDefault(title: 'Morning milking', weekdays: [1, 2, 3, 4, 5, 6]),
         ],
       );
       await repo.saveRoleDefaultSet(base);
