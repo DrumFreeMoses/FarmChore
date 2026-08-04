@@ -124,7 +124,12 @@ class ChoreRepository {
   }
 
   /// Appends [title] (every workday) to [role]'s active default set.
-  Future<void> addDefaultChore(FarmRole role, String title) async {
+  Future<void> addDefaultChore(
+    FarmRole role,
+    String title, {
+    String description = '',
+    List<String> checklist = const [],
+  }) async {
     final sets = await loadBaseRoleDefaultSets();
     final set = sets.where((s) => s.role == role).firstOrNull;
     await saveRoleDefaultSet(
@@ -132,7 +137,12 @@ class ChoreRepository {
         role: role,
         chores: [
           ...?set?.chores,
-          ChoreDefault(title: title, weekdays: const [1, 2, 3, 4, 5, 6, 7]),
+          ChoreDefault(
+            title: title,
+            weekdays: const [1, 2, 3, 4, 5, 6, 7],
+            description: description,
+            checklist: checklist,
+          ),
         ],
       ),
     );

@@ -3,6 +3,7 @@ import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/daily_generator.dart';
 import 'package:farm_chore/domain/roles.dart';
+import 'package:farm_chore/theme/farm_theme.dart';
 
 /// One popup to add a chore or a one-off task, anywhere in the app.
 ///
@@ -33,11 +34,14 @@ class NewItemDialog extends StatefulWidget {
 class _NewItemDialogState extends State<NewItemDialog> {
   late DateTime _date = widget.today ?? DateTime.now();
   final _title = TextEditingController();
+  final _description = TextEditingController();
+  final _newCheckItem = TextEditingController();
   ChoreType _type = ChoreType.chore;
   FarmRole _role = FarmRoles.all.first;
   String? _assignee;
   bool _addToDefault = false;
   List<String> _members = [];
+  List<String> _checklist = [];
 
   @override
   void initState() {
@@ -54,6 +58,15 @@ class _NewItemDialogState extends State<NewItemDialog> {
   String _shortHex(String pubkey) =>
       '${pubkey.substring(0, 8)}…${pubkey.substring(pubkey.length - 6)}';
 
+  void _addCheckItem() {
+    final text = _newCheckItem.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      _checklist.add(text);
+      _newCheckItem.clear();
+    });
+  }
+
   Future<void> _submit() async {
     final title = _title.text.trim();
     if (title.isEmpty) return;
@@ -67,7 +80,13 @@ class _NewItemDialogState extends State<NewItemDialog> {
     );
     await widget.repository.saveInstance(instance);
     if (_addToDefault && _type == ChoreType.chore) {
-      await widget.repository.addDefaultChore(_role, title);
+      final desc = _description.text.trim();
+      await widget.repository.addDefaultChore(
+        _role,
+        title,
+        description: desc,
+        checklist: _checklist,
+      );
       await widget.repository.syncDayToDefaults(_date);
     }
     if (_assignee != null && _assignee != widget.repository.myPubkey) {
@@ -78,6 +97,8 @@ class _NewItemDialogState extends State<NewItemDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final showDefaultFields = _addToDefault && _type == ChoreType.chore;
+
     return AlertDialog(
       title: const Text('New chore or task'),
       content: SingleChildScrollView(
@@ -162,6 +183,64 @@ class _NewItemDialogState extends State<NewItemDialog> {
                 value: _addToDefault,
                 onChanged: (value) => setState(() => _addToDefault = value),
               ),
+            if (showDefaultFields) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _description,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Description (required)',
+                  hintText: 'How to do this chore',
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text('Checklist', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 4),
+              if (_checklist.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'No items yet',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: FarmColors.sabbath),
+                  ),
+                ),
+              for (var i = 0; i < _checklist.length; i++)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_outline, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_checklist[i])),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 16),
+                        onPressed: () => setState(() => _checklist.removeAt(i)),
+                      ),
+                    ],
+                  ),
+                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _newCheckItem,
+                      decoration: const InputDecoration(
+                        hintText: 'Add item…',
+                        isDense: true,
+                      ),
+                      onSubmitted: (_) => _addCheckItem(),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: _addCheckItem,
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
