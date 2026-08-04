@@ -214,10 +214,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Morning milking'));
     await tester.pumpAndSettle();
+    // Detail screen opens; tap the actions button in the appbar.
+    await tester.tap(find.byTooltip('Actions'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Mark done'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Done'), findsOneWidget);
+    expect(find.text('Done'), findsWidgets);
 
     await tester.pageBack();
     await tester.pumpAndSettle();

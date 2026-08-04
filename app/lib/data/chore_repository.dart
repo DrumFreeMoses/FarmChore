@@ -5,6 +5,7 @@ import 'package:nostr/nostr.dart' hide Event;
 
 import '../data/app_database.dart';
 import '../domain/assignment.dart';
+import '../domain/chore_comment.dart';
 import '../domain/chore_instance.dart';
 import '../domain/daily_generator.dart';
 import '../domain/edit_event.dart';
@@ -76,9 +77,15 @@ class ChoreRepository {
         latest[key] = row;
       }
     }
-    return latest.values
-        .map((row) => RoleDefaultSet.fromNostrEvent(_toNostr(row)))
-        .toList();
+    final sets = <RoleDefaultSet>[];
+    for (final row in latest.values) {
+      try {
+        sets.add(RoleDefaultSet.fromNostrEvent(_toNostr(row)));
+      } catch (_) {
+        // Skip deleted or malformed events.
+      }
+    }
+    return sets;
   }
 
   /// Only the base (active) sets: the ones daily generation uses.
@@ -129,6 +136,85 @@ class ChoreRepository {
         ],
       ),
     );
+  }
+
+  /// Loads all named chore sets (variants) for [role], newest first.
+  Future<List<RoleDefaultSet>> loadChoreSets(FarmRole role) async {
+    final all = await loadRoleDefaultSets();
+    return all.where((s) => s.role == role && !s.isBase).toList()
+      ..sort((a, b) => b.name!.compareTo(a.name!));
+  }
+
+  /// Saves a named chore set for [role].
+  Future<void> saveChoreSet(
+    FarmRole role,
+    String name,
+    List<ChoreDefault> chores,
+  ) async {
+    await saveRoleVariant(role, name, chores);
+  }
+
+  /// Activates a named chore set: copies its chores to the role's base set.
+  Future<void> activateChoreSet(RoleDefaultSet set) async {
+    await activateRoleSet(set);
+  }
+
+  /// Deletes a named chore set by saving an empty event with the same d tag.
+  /// (NIP-01: the latest event per d tag wins; an empty content signals deletion.)
+  Future<void> deleteChoreSet(RoleDefaultSet set) async {
+    await _persist(
+      NostrEvent(
+        pubKey: keys.public,
+        createdAt: _now(),
+        kind: roleDefaultSetKind,
+        tags: [
+          ['d', set.dTag],
+          if (farmPubkey != null) ['farm', farmPubkey!],
+        ],
+        content: '{}',
+      ),
+    );
+  }
+
+  // ── Chore comments ─────────────────────────────────────────────────
+
+  /// Adds a comment to a chore instance.
+  Future<void> addComment(String instanceDTag, String text) async {
+    final now = _now();
+    await _persist(
+      ChoreComment(
+        text: text,
+        author: myPubkey,
+        createdAt: now,
+        instanceDTag: instanceDTag,
+      ).toNostrEvent(pubKey: myPubkey, createdAt: now, farmPubkey: farmPubkey),
+    );
+  }
+
+  /// Loads all comments for a chore instance, newest first.
+  Future<List<ChoreComment>> loadComments(String instanceDTag) async {
+    final rows = await database.eventsForKind(choreCommentKind).get();
+    final latest = <String, Event>{};
+    for (final row in rows) {
+      final dTag = _dTag(row) ?? row.id;
+      // Only comments whose d tag starts with the instance d tag.
+      final parts = dTag.split('|');
+      if (parts.length < 3) continue;
+      final rowInstanceDTag = parts.sublist(0, parts.length - 2).join('|');
+      if (rowInstanceDTag != instanceDTag) continue;
+      final current = latest[dTag];
+      if (current == null ||
+          row.createdAt > current.createdAt ||
+          (row.createdAt == current.createdAt &&
+              row.id.compareTo(current.id) > 0)) {
+        latest[dTag] = row;
+      }
+    }
+    final comments = latest.values.map(
+      (r) => ChoreComment.fromNostrEvent(_toNostr(r)),
+    );
+    return comments.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   /// Members known to the farm: me first, then everyone who signed or was
@@ -520,6 +606,7 @@ class ChoreRepository {
     memberProfileKind,
     headsUpKind,
     farmMessageKind,
+    choreCommentKind,
   ];
 
   /// Events still queued for the relay.

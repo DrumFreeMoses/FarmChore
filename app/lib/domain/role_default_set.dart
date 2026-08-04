@@ -13,6 +13,8 @@ class ChoreDefault {
     required this.weekdays,
     this.assigneeHint,
     this.requiredSkills = const [],
+    this.description = '',
+    this.checklist = const [],
   });
 
   final String title;
@@ -25,21 +27,35 @@ class ChoreDefault {
   /// Empty means no skill requirement.
   final List<String> requiredSkills;
 
+  /// Concise overview of what this chore involves.
+  final String description;
+
+  /// Standard checklist items for this chore.
+  final List<String> checklist;
+
   bool runsOnWeekday(DateTime date) => weekdays.contains(date.weekday);
 
-  ChoreDefault copyWith({String? assigneeHint, List<String>? requiredSkills}) =>
-      ChoreDefault(
-        title: title,
-        weekdays: weekdays,
-        assigneeHint: assigneeHint ?? this.assigneeHint,
-        requiredSkills: requiredSkills ?? this.requiredSkills,
-      );
+  ChoreDefault copyWith({
+    String? assigneeHint,
+    List<String>? requiredSkills,
+    String? description,
+    List<String>? checklist,
+  }) => ChoreDefault(
+    title: title,
+    weekdays: weekdays,
+    assigneeHint: assigneeHint ?? this.assigneeHint,
+    requiredSkills: requiredSkills ?? this.requiredSkills,
+    description: description ?? this.description,
+    checklist: checklist ?? this.checklist,
+  );
 
   Map<String, dynamic> toJson() => {
     'title': title,
     'weekdays': weekdays,
     if (assigneeHint != null) 'assigneeHint': assigneeHint,
     if (requiredSkills.isNotEmpty) 'requiredSkills': requiredSkills,
+    if (description.isNotEmpty) 'description': description,
+    if (checklist.isNotEmpty) 'checklist': checklist,
   };
 
   factory ChoreDefault.fromJson(Map<String, dynamic> json) {
@@ -59,11 +75,14 @@ class ChoreDefault {
     }
     final requiredSkills =
         (json['requiredSkills'] as List?)?.cast<String>() ?? const [];
+    final checklist = (json['checklist'] as List?)?.cast<String>() ?? const [];
     return ChoreDefault(
       title: title,
       weekdays: parsed,
       assigneeHint: json['assigneeHint'] as String?,
       requiredSkills: requiredSkills,
+      description: (json['description'] as String?) ?? '',
+      checklist: checklist,
     );
   }
 }

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
 import 'package:farm_chore/domain/roles.dart';
+import 'package:farm_chore/screens/chore_detail_screen.dart';
 import 'package:farm_chore/widgets/chore_card.dart';
 import 'package:farm_chore/widgets/new_item_dialog.dart';
-import 'package:farm_chore/widgets/status_actions_sheet.dart';
 
+import 'chore_set_screen.dart';
 import 'defaults_screen.dart';
 
 /// One role's chore list for a day (e.g. "Milker's Chores").
@@ -55,6 +56,21 @@ class _RoleChoresScreenState extends State<RoleChoresScreen> {
       appBar: AppBar(
         title: Text(widget.role.displayName),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.library_books),
+            tooltip: 'Chore sets',
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ChoreSetScreen(
+                    repository: widget.repository,
+                    role: widget.role,
+                  ),
+                ),
+              );
+              if (mounted) _refresh();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.tune),
             tooltip: 'Edit defaults',
@@ -107,13 +123,18 @@ class _RoleChoresScreenState extends State<RoleChoresScreen> {
                         return ChoreCard(
                           instance: instance,
                           memberNames: _names,
-                          onTap: () => showStatusActions(
-                            context: context,
-                            repository: widget.repository,
-                            instance: instance,
-                            today: _today,
-                            onChanged: _refresh,
-                          ),
+                          onTap: () async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ChoreDetailScreen(
+                                  instance: instance,
+                                  repository: widget.repository,
+                                  myPubkey: widget.repository.myPubkey,
+                                ),
+                              ),
+                            );
+                            _refresh();
+                          },
                         );
                       },
                     ),

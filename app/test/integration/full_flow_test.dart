@@ -24,14 +24,8 @@ void main() {
       const defaults = RoleDefaultSet(
         role: FarmRole.milkers,
         chores: [
-          ChoreDefault(
-            title: 'Morning milking',
-            weekdays: [1, 2, 3, 4, 5, 6],
-          ),
-          ChoreDefault(
-            title: 'Evening milking',
-            weekdays: [1, 2, 3, 4, 5, 6],
-          ),
+          ChoreDefault(title: 'Morning milking', weekdays: [1, 2, 3, 4, 5, 6]),
+          ChoreDefault(title: 'Evening milking', weekdays: [1, 2, 3, 4, 5, 6]),
         ],
       );
       await repo.saveRoleDefaultSet(defaults);
@@ -98,8 +92,10 @@ void main() {
   group('Integration: messaging flow', () {
     test('broadcast and DM flow', () async {
       await repo.sendMessage('Good morning farm!');
-      await repo.sendMessage('Hey, can you cover my shift?',
-          recipient: 'key456');
+      await repo.sendMessage(
+        'Hey, can you cover my shift?',
+        recipient: 'key456',
+      );
 
       final messages = await repo.loadMessages();
       expect(messages.length, 2);
