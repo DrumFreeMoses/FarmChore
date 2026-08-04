@@ -23,7 +23,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('FarmChore'), findsOneWidget);
+    expect(find.text('FarmChore for Jacob Springs Farm'), findsOneWidget);
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('My Chores'), findsOneWidget);
     expect(find.text('Remaining'), findsOneWidget);

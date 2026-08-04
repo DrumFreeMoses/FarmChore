@@ -19,14 +19,9 @@ void main() {
       expect(decoded.assigneeHint, 'Sarah');
     });
 
-    test('rejects weekdays outside 1-6 (Sunday rest)', () {
-      expect(
-        () => ChoreDefault.fromJson({
-          'title': 'x',
-          'weekdays': [7],
-        }),
-        throwsA(isA<FormatException>()),
-      );
+    test('accepts weekdays 1-7 (Sunday included)', () {
+      const chore = ChoreDefault(title: 'x', weekdays: [7]);
+      expect(chore.weekdays, [7]);
       expect(
         () => ChoreDefault.fromJson({
           'title': 'x',

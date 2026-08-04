@@ -20,7 +20,7 @@ class MemberProfile {
   final String pubkey;
   final String name;
 
-  /// Weekday off (1=Monday .. 6=Saturday), or null for no regular day off.
+  /// Weekday off (1=Monday .. 7=Sunday), or null for no regular day off.
   final int? dayOff;
 
   /// Skill tags this member has (e.g. `milker`, `skid-loader`, `tractor`).

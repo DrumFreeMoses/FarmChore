@@ -19,7 +19,7 @@ class ChoreDefault {
 
   final String title;
 
-  /// 1=Monday .. 6=Saturday. Sundays are rest days at the farm.
+  /// 1=Monday .. 7=Sunday.
   final List<int> weekdays;
   final String? assigneeHint;
 
@@ -68,10 +68,8 @@ class ChoreDefault {
       throw const FormatException('chore default needs weekdays');
     }
     final parsed = weekdays.map((w) => w as int).toList();
-    if (parsed.any((w) => w < 1 || w > 6)) {
-      throw const FormatException(
-        'weekdays must be 1=Monday..6=Saturday (Sunday rest)',
-      );
+    if (parsed.any((w) => w < 1 || w > 7)) {
+      throw const FormatException('weekdays must be 1=Monday..7=Sunday');
     }
     final requiredSkills =
         (json['requiredSkills'] as List?)?.cast<String>() ?? const [];

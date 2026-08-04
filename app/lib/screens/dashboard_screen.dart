@@ -115,19 +115,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Future<void> _resetAllData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset all data?'),
+        content: const Text(
+          'This will delete all chores, profiles, messages, and settings. '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: FarmColors.error),
+            child: const Text('Delete everything'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await widget.repository.purgeAllData();
+    await _refresh();
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('All data deleted')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FarmChore'),
+        title: const Text('FarmChore for Jacob Springs Farm'),
         actions: [
           SyncStatusBadge(repository: widget.repository, onSync: _refresh),
-          if (!_hasDefaults)
-            IconButton(
-              icon: const Icon(Icons.agriculture),
-              tooltip: 'Load demo data',
-              onPressed: _loadDemoData,
-            ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'load_demo') _loadDemoData();
+              if (value == 'reset_all') _resetAllData();
+            },
+            itemBuilder: (_) => [
+              if (!_hasDefaults)
+                const PopupMenuItem(
+                  value: 'load_demo',
+                  child: ListTile(
+                    leading: Icon(Icons.agriculture),
+                    title: Text('Load demo data'),
+                    dense: true,
+                  ),
+                ),
+              const PopupMenuItem(
+                value: 'reset_all',
+                child: ListTile(
+                  leading: Icon(Icons.delete_forever, color: FarmColors.error),
+                  title: Text('Reset all data'),
+                  dense: true,
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: Icon(_gridMode ? Icons.view_list : Icons.grid_view),
             tooltip: _gridMode ? 'Show list' : 'Show grid',

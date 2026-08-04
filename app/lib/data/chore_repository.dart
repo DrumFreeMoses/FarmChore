@@ -132,7 +132,7 @@ class ChoreRepository {
         role: role,
         chores: [
           ...?set?.chores,
-          ChoreDefault(title: title, weekdays: const [1, 2, 3, 4, 5, 6]),
+          ChoreDefault(title: title, weekdays: const [1, 2, 3, 4, 5, 6, 7]),
         ],
       ),
     );
@@ -778,5 +778,11 @@ class ChoreRepository {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Deletes ALL events from the local database.
+  /// Use with caution — this wipes all chore data, profiles, messages, etc.
+  Future<void> purgeAllData() async {
+    await database.delete(database.events).go();
   }
 }

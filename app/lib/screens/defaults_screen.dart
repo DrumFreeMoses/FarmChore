@@ -167,7 +167,7 @@ class _DefaultsScreenState extends State<DefaultsScreen> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: _base!.chores.length,
-  // ignore: deprecated_member_use
+                    // ignore: deprecated_member_use
                     onReorder: _onReorder,
                     itemBuilder: (context, index) {
                       final chore = _base!.chores[index];
@@ -290,10 +290,11 @@ String _choreSummary(ChoreDefault chore) {
   return parts.join(' · ');
 }
 
-const _dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const _dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 String _weekdaySummary(List<int> weekdays) {
-  if (weekdays.length == 6) return 'Every workday';
+  if (weekdays.length == 7) return 'Every day';
+  if (weekdays.length == 6 && !weekdays.contains(7)) return 'Every workday';
   return weekdays.map((w) => _dayNames[w - 1]).join(', ');
 }
 
@@ -326,7 +327,7 @@ class _ChoreEditDialogState extends State<_ChoreEditDialog> {
     _checklistCtrls = [
       for (final item in e?.checklist ?? []) TextEditingController(text: item),
     ];
-    _weekdays = List<int>.from(e?.weekdays ?? const [1, 2, 3, 4, 5, 6]);
+    _weekdays = List<int>.from(e?.weekdays ?? const [1, 2, 3, 4, 5, 6, 7]);
     if (_checklistCtrls.isEmpty) _checklistCtrls.add(TextEditingController());
   }
 
@@ -476,7 +477,7 @@ class _ChoreEditDialogState extends State<_ChoreEditDialog> {
               Wrap(
                 spacing: 6,
                 children: [
-                  for (int d = 1; d <= 6; d++)
+                  for (int d = 1; d <= 7; d++)
                     FilterChip(
                       label: Text(_dayNames[d - 1]),
                       selected: _weekdays.contains(d),

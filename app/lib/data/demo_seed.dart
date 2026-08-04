@@ -6,16 +6,22 @@ import 'package:farm_chore/domain/roles.dart';
 ///
 /// Grounded in the farm site: grass-based Alpine Jersey milk, eggs, pork,
 /// beef, lamb, chicken, heirloom grains, produce, comb honey, Farm Store.
-/// All chores run Mon–Sat (weekdays 1-6); Sundays rest.
+/// Dairy runs 7 days a week; other roles vary.
 /// Correct the lists with the farm's real rhythm and re-run the seed.
 const List<RoleDefaultSet> farmDefaults = [
   RoleDefaultSet(
     role: FarmRole.milkers,
     chores: [
-      ChoreDefault(title: 'Morning milking', weekdays: [1, 2, 3, 4, 5, 6]),
-      ChoreDefault(title: 'Evening milking', weekdays: [1, 2, 3, 4, 5, 6]),
-      ChoreDefault(title: 'Clean milking parlor', weekdays: [1, 2, 3, 4, 5, 6]),
-      ChoreDefault(title: 'Process milk & cream', weekdays: [1, 2, 3, 4, 5, 6]),
+      ChoreDefault(title: 'Morning milking', weekdays: [1, 2, 3, 4, 5, 6, 7]),
+      ChoreDefault(title: 'Evening milking', weekdays: [1, 2, 3, 4, 5, 6, 7]),
+      ChoreDefault(
+        title: 'Clean milking parlor',
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+      ),
+      ChoreDefault(
+        title: 'Process milk & cream',
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+      ),
     ],
   ),
   RoleDefaultSet(
@@ -23,15 +29,15 @@ const List<RoleDefaultSet> farmDefaults = [
     chores: [
       ChoreDefault(
         title: 'Bottle milk for shares',
-        weekdays: [1, 2, 3, 4, 5, 6],
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
       ),
       ChoreDefault(
         title: 'Fill Farm Store milk fridge',
-        weekdays: [1, 2, 3, 4, 5, 6],
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
       ),
       ChoreDefault(
         title: 'Wash bottles & equipment',
-        weekdays: [1, 2, 3, 4, 5, 6],
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
       ),
     ],
   ),
@@ -40,14 +46,17 @@ const List<RoleDefaultSet> farmDefaults = [
     chores: [
       ChoreDefault(
         title: 'Feed cows hay & grain',
-        weekdays: [1, 2, 3, 4, 5, 6],
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
       ),
-      ChoreDefault(title: 'Feed pigs', weekdays: [1, 2, 3, 4, 5, 6]),
+      ChoreDefault(title: 'Feed pigs', weekdays: [1, 2, 3, 4, 5, 6, 7]),
       ChoreDefault(
         title: 'Feed chickens & collect eggs',
-        weekdays: [1, 2, 3, 4, 5, 6],
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
       ),
-      ChoreDefault(title: 'Check water troughs', weekdays: [1, 2, 3, 4, 5, 6]),
+      ChoreDefault(
+        title: 'Check water troughs',
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+      ),
     ],
   ),
   RoleDefaultSet(

@@ -119,7 +119,10 @@ void main() {
     // Fill title (first TextField).
     await tester.enterText(find.byType(TextField).first, 'Ice the milk');
     // Fill description (second TextField).
-    await tester.enterText(find.byType(TextField).at(1), 'Cool the milk quickly after milking');
+    await tester.enterText(
+      find.byType(TextField).at(1),
+      'Cool the milk quickly after milking',
+    );
     // Fill first checklist item (third TextField).
     await tester.enterText(find.byType(TextField).at(2), 'Check ice level');
     await tester.tap(find.text('Add'));

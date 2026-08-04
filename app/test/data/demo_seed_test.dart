@@ -101,10 +101,13 @@ void main() {
     // List mode shows the per-role empty state; grid mode shows headers.
     await tester.tap(find.byTooltip('Show list'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Load demo data'), findsOneWidget);
+    // Demo data is in the popup menu — open it first.
+    await tester.tap(find.byTooltip('Show menu'));
+    await tester.pumpAndSettle();
+    expect(find.text('Load demo data'), findsOneWidget);
     expect(find.text('No chores today'), findsNWidgets(6));
 
-    await tester.tap(find.byTooltip('Load demo data'));
+    await tester.tap(find.text('Load demo data'));
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('Load demo data'), findsNothing);

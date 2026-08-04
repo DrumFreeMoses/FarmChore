@@ -27,7 +27,7 @@ class FarmChoreApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'FarmChore',
+      title: 'FarmChore for Jacob Springs Farm',
       theme: farmTheme(),
       home: const _Bootstrap(),
     );

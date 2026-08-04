@@ -6,7 +6,7 @@ import 'role_default_set.dart';
 /// (kind 31501).
 abstract final class DailyGenerator {
   /// Generates open instances for [date] from each default that runs on
-  /// that weekday. Sundays generate nothing (the farm rests).
+  /// that weekday.
   ///
   /// When [members] is provided, auto-assigns chores to the hint member
   /// only if they are qualified (have required skills) and available (not
