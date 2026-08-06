@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/FarmChore/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Chore management for Jacob Springs Farm">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4E6B3A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FarmChore">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="manifest" href="manifest.json">
+
+  <title>FarmChore</title>
+
+  <style>
+    body { margin: 0; background-color: #FAF6EF; }
+  </style>
+</head>
+<body>
+  <script>
+    // Register the service worker for offline caching and background notifications.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        // Cache-bust sw.js so hard refresh always gets the latest version.
+        fetch('./version.json').then(r => r.json()).then(v => {
+          const swUrl = './sw.js?v=' + (v.build || Date.now());
+          navigator.serviceWorker.register(swUrl).then((reg) => {
+            console.log('Service worker registered:', reg.scope);
+          }).catch((err) => {
+            console.warn('Service worker registration failed:', err);
+          });
+        }).catch(() => {
+          navigator.serviceWorker.register('./sw.js').then((reg) => {
+            console.log('Service worker registered:', reg.scope);
+          }).catch((err) => {
+            console.warn('Service worker registration failed:', err);
+          });
+        });
+      });
+    }
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
