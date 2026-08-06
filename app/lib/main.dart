@@ -101,7 +101,11 @@ class _BootstrapState extends State<_Bootstrap> {
   Future<_Session> _bootstrap(RelayConfig relayConfig) async {
     final relayUrl = relayConfig.url ?? _defaultRelay;
     final apiKey = relayConfig.apiKey;
-    final identity = await IdentityService(SecureKeyStorage()).ensureIdentity();
+    // On web, FlutterSecureStorage can hang; use SharedPreferences for keys.
+    final keyStorage = kIsWeb
+        ? _SharedPrefsKeyStorage(await SharedPreferences.getInstance())
+        : SecureKeyStorage();
+    final identity = await IdentityService(keyStorage).ensureIdentity();
     final database = await AppDatabase.open();
     final repository = ChoreRepository(database: database, keys: identity.keys);
     final sync = SyncService(
@@ -287,4 +291,21 @@ class _Session {
   final String myPubkey;
   final String relayUrl;
   final RelayConfig relayConfig;
+}
+
+/// Web-compatible key storage using SharedPreferences (localStorage).
+/// FlutterSecureStorage hangs on web because it depends on a native keychain.
+class _SharedPrefsKeyStorage implements KeyStorage {
+  _SharedPrefsKeyStorage(this._prefs);
+  final SharedPreferences _prefs;
+  static const _key = 'farmchore_member_nsec';
+
+  @override
+  Future<void> save(String nsec) => _prefs.setString(_key, nsec);
+
+  @override
+  Future<String?> load() async => _prefs.getString(_key);
+
+  @override
+  Future<void> clear() => _prefs.remove(_key);
 }
