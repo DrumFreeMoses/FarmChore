@@ -315,6 +315,9 @@ class _ChoreEditDialogState extends State<_ChoreEditDialog> {
   late final TextEditingController _descCtrl;
   late final List<TextEditingController> _checklistCtrls;
   late List<int> _weekdays;
+  String? _dueTime;
+  late final TextEditingController _reminderCtrl;
+  late final TextEditingController _escalationCtrl;
 
   bool get _isEditing => widget.existing != null;
 
@@ -328,6 +331,13 @@ class _ChoreEditDialogState extends State<_ChoreEditDialog> {
       for (final item in e?.checklist ?? []) TextEditingController(text: item),
     ];
     _weekdays = List<int>.from(e?.weekdays ?? const [1, 2, 3, 4, 5, 6, 7]);
+    _dueTime = e?.dueTime;
+    _reminderCtrl = TextEditingController(
+      text: e?.reminderMinutes?.toString() ?? '',
+    );
+    _escalationCtrl = TextEditingController(
+      text: e?.escalationMinutes?.toString() ?? '',
+    );
     if (_checklistCtrls.isEmpty) _checklistCtrls.add(TextEditingController());
   }
 
@@ -338,6 +348,8 @@ class _ChoreEditDialogState extends State<_ChoreEditDialog> {
     for (final c in _checklistCtrls) {
       c.dispose();
     }
+    _reminderCtrl.dispose();
+    _escalationCtrl.dispose();
     super.dispose();
   }
 
@@ -394,6 +406,9 @@ class _ChoreEditDialogState extends State<_ChoreEditDialog> {
         requiredSkills: widget.existing?.requiredSkills ?? const [],
         description: desc,
         checklist: checklist,
+        dueTime: _dueTime,
+        reminderMinutes: int.tryParse(_reminderCtrl.text.trim()),
+        escalationMinutes: int.tryParse(_escalationCtrl.text.trim()),
       ),
     );
   }
@@ -494,6 +509,73 @@ class _ChoreEditDialogState extends State<_ChoreEditDialog> {
                     ),
                 ],
               ),
+              const SizedBox(height: 16),
+              Text('Schedule', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 4),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.access_time),
+                title: Text(_dueTime ?? 'No due time set'),
+                subtitle: const Text(
+                  'Optional: when this chore is due each day',
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_dueTime != null)
+                      IconButton(
+                        icon: const Icon(Icons.clear, size: 16),
+                        onPressed: () => setState(() => _dueTime = null),
+                      ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: _dueTime != null
+                        ? TimeOfDay(
+                            hour: int.parse(_dueTime!.split(':')[0]),
+                            minute: int.parse(_dueTime!.split(':')[1]),
+                          )
+                        : const TimeOfDay(hour: 8, minute: 0),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      _dueTime =
+                          '${picked.hour.toString().padLeft(2, '0')}:'
+                          '${picked.minute.toString().padLeft(2, '0')}';
+                    });
+                  }
+                },
+              ),
+              if (_dueTime != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Escalation',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: _reminderCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Reminder (minutes before due)',
+                    hintText: 'e.g. 15',
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _escalationCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Escalation (minutes after due)',
+                    hintText: 'e.g. 30',
+                    isDense: true,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
