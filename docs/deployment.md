@@ -28,7 +28,7 @@ python3 -c "
 import re
 with open('build/web/flutter_bootstrap.js', 'r') as f:
     c = f.read()
-c = re.sub(r'serviceWorkerSettings:\s*\{[^}]+\}', '/* sw disabled */', c)
+c = re.sub(r'\{\s*serviceWorkerSettings:\s*\{[^}]*\}\s*\}', '{}', c)
 with open('build/web/flutter_bootstrap.js', 'w') as f:
     f.write(c)
 "

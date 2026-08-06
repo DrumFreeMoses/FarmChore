@@ -74,7 +74,7 @@ class _BootstrapState extends State<_Bootstrap> {
       if (!mounted) return Future.error(StateError('unmounted'));
       final chosen = await Navigator.of(context).push<String>(
         MaterialPageRoute(
-          builder: (_) => _WelcomeScreen(relayConfig: relayConfig),
+          builder: (_) => const _WelcomeScreen(),
         ),
       );
       if (chosen == null) {
@@ -135,13 +135,7 @@ class _BootstrapState extends State<_Bootstrap> {
       future: _session,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _WelcomeScreen(
-            relayConfig: RelayConfig(
-              // This will be replaced on next interaction.
-              // ignore: invalid_use_of_visible_for_testing_member
-              SharedPreferences.getInstance() as dynamic,
-            ),
-          );
+          return const _WelcomeScreen();
         }
         if (!snapshot.hasData) {
           return const Scaffold(
@@ -161,13 +155,35 @@ class _BootstrapState extends State<_Bootstrap> {
 }
 
 /// Welcome screen shown on first launch: join via QR or set up as owner.
-class _WelcomeScreen extends StatelessWidget {
-  const _WelcomeScreen({required this.relayConfig});
+class _WelcomeScreen extends StatefulWidget {
+  const _WelcomeScreen();
 
-  final RelayConfig relayConfig;
+  @override
+  State<_WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<_WelcomeScreen> {
+  RelayConfig? _relayConfig;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConfig();
+  }
+
+  Future<void> _loadConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _relayConfig = RelayConfig(prefs));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final relayConfig = _relayConfig;
+    if (relayConfig == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Scaffold(
       body: Center(
         child: Padding(
