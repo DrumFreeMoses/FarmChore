@@ -16,20 +16,16 @@ import 'package:farm_chore/sync/sync_service.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Build-time default relay URL. Overridden at build via:
-///   flutter build web --dart-define=FARMCHORE_RELAY=wss://relay.farm.example
 const String _defaultRelay = String.fromEnvironment(
   'FARMCHORE_RELAY',
   defaultValue: 'ws://localhost:7447',
 );
 
-/// Production relay for JSF. Embedded at build time.
 const String _productionRelay = String.fromEnvironment(
   'FARMCHORE_RELAY',
   defaultValue: 'wss://farmchore.fly.dev',
 );
 
-/// Production API key. Embedded at build time.
 const String _productionApiKey = String.fromEnvironment(
   'FARMCHORE_API_KEY',
   defaultValue: '21b03470afde01c22075cadb597b6e1d',
@@ -52,7 +48,6 @@ class FarmChoreApp extends StatelessWidget {
   }
 }
 
-/// Resolves identity, relay URL, and opens the database, then shows the shell.
 class _Bootstrap extends StatefulWidget {
   const _Bootstrap();
 
@@ -63,50 +58,57 @@ class _Bootstrap extends StatefulWidget {
 class _BootstrapState extends State<_Bootstrap> {
   Timer? _syncTimer;
   SyncService? _sync;
-  Future<_Session>? _session;
+  bool _loading = true;
+  String? _error;
+  _Session? _session;
 
   @override
   void initState() {
     super.initState();
-    _session = _open();
+    _init();
   }
 
-  Future<_Session> _open() async {
-    final prefs = await SharedPreferences.getInstance();
-    final relayConfig = RelayConfig(prefs);
+  Future<void> _init() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
-    // If no relay URL is stored, show the join/start screen.
-    if (relayConfig.url == null) {
-      if (!mounted) return Future.error(StateError('unmounted'));
-      final chosen = await Navigator.of(context).push<String>(
-        MaterialPageRoute(
-          builder: (_) => _WelcomeScreen(
-            onSelected: (relay, key) async {
-              await relayConfig.configure(url: relay, apiKey: key);
-              if (mounted) {
-                Navigator.of(context).pop(relay);
-              }
-            },
-          ),
-        ),
-      );
-      if (chosen == null) {
-        return Future.error(StateError('no relay chosen'));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final relayConfig = RelayConfig(prefs);
+
+      if (relayConfig.url == null) {
+        // Show welcome screen inline — no Navigator.push.
+        setState(() => _loading = false);
+        return;
       }
-    }
 
-    return _bootstrap(relayConfig);
+      await _startSession(relayConfig);
+    } catch (e) {
+      setState(() {
+        _error = '$e';
+        _loading = false;
+      });
+    }
   }
 
-  Future<_Session> _bootstrap(RelayConfig relayConfig) async {
+  Future<void> _startSession(RelayConfig relayConfig) async {
     final relayUrl = relayConfig.url ?? _defaultRelay;
     final apiKey = relayConfig.apiKey;
-    // On web, FlutterSecureStorage can hang; use SharedPreferences for keys.
+    print('[bootstrap] relay=$relayUrl');
+
     final keyStorage = kIsWeb
         ? _SharedPrefsKeyStorage(await SharedPreferences.getInstance())
         : SecureKeyStorage();
+    print('[bootstrap] key storage ready');
+
     final identity = await IdentityService(keyStorage).ensureIdentity();
+    print('[bootstrap] identity ready');
+
     final database = await AppDatabase.open();
+    print('[bootstrap] database ready');
+
     final repository = ChoreRepository(database: database, keys: identity.keys);
     final sync = SyncService(
       repository: repository,
@@ -120,11 +122,8 @@ class _BootstrapState extends State<_Bootstrap> {
       (_) => unawaited(sync.sync()),
     );
     sync.startLiveSubscription();
-
-    // Run escalation check for overdue chores.
     unawaited(EscalationService(repository).check());
 
-    // Connect the service worker for background notifications.
     if (kIsWeb) {
       NotificationService.requestPermission();
       NotificationService.connectBackgroundRelay(
@@ -134,20 +133,25 @@ class _BootstrapState extends State<_Bootstrap> {
       );
     }
 
-    return _Session(
-      repository: repository,
-      myPubkey: identity.pubkey,
-      relayUrl: relayUrl,
-      relayConfig: relayConfig,
-    );
+    print('[bootstrap] done');
+    setState(() {
+      _session = _Session(
+        repository: repository,
+        myPubkey: identity.pubkey,
+        relayUrl: relayUrl,
+        relayConfig: relayConfig,
+      );
+      _loading = false;
+    });
   }
 
-  void _retry() {
+  Future<void> _onRelaySelected(String relay, {String? apiKey}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final relayConfig = RelayConfig(prefs);
+    await relayConfig.configure(url: relay, apiKey: apiKey);
     _sync?.stopLiveSubscription();
     _syncTimer?.cancel();
-    setState(() {
-      _session = _open();
-    });
+    await _startSession(relayConfig);
   }
 
   @override
@@ -159,65 +163,73 @@ class _BootstrapState extends State<_Bootstrap> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<_Session>(
-      future: _session,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _WelcomeScreen(
-            onSelected: (relay, key) async {
-              final prefs = await SharedPreferences.getInstance();
-              final relayConfig = RelayConfig(prefs);
-              await relayConfig.configure(url: relay, apiKey: key);
-              _retry();
-            },
-          );
-        }
-        if (!snapshot.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        final session = snapshot.data!;
-        return HomeShell(
-          repository: session.repository,
-          myPubkey: session.myPubkey,
-          relayUrl: session.relayUrl,
-          relayConfig: session.relayConfig,
-        );
-      },
+    if (_loading && _session == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_session != null) {
+      return HomeShell(
+        repository: _session!.repository,
+        myPubkey: _session!.myPubkey,
+        relayUrl: _session!.relayUrl,
+        relayConfig: _session!.relayConfig,
+      );
+    }
+
+    return _WelcomeScreen(
+      onSelected: _onRelaySelected,
+      error: _error,
     );
   }
 }
 
-/// Callback when a relay is selected: (relayUrl, apiKey?).
-typedef OnRelaySelected = Future<void> Function(String relay, String? apiKey);
-
-/// Welcome screen shown on first launch or after error.
 class _WelcomeScreen extends StatefulWidget {
-  const _WelcomeScreen({required this.onSelected});
+  const _WelcomeScreen({required this.onSelected, this.error});
 
-  final OnRelaySelected onSelected;
+  final Future<void> Function(String relay, {String? apiKey}) onSelected;
+  final String? error;
 
   @override
   State<_WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
 class _WelcomeScreenState extends State<_WelcomeScreen> {
-  bool _loading = false;
+  bool _busy = false;
 
   Future<void> _select(String relay, {String? apiKey}) async {
-    if (_loading) return;
-    setState(() => _loading = true);
-    await widget.onSelected(relay, apiKey);
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await widget.onSelected(relay, apiKey: apiKey);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Setup failed: $e')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (_busy) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Setting up...'),
+            ],
+          ),
+        ),
       );
     }
+
     return Scaffold(
       body: Center(
         child: Padding(
@@ -240,6 +252,20 @@ class _WelcomeScreenState extends State<_WelcomeScreen> {
                 'Chore management for your farm',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
+              if (widget.error != null) ...[
+                const SizedBox(height: 16),
+                Card(
+                  color: FarmColors.error.withAlpha(25),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      widget.error!,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 48),
               FilledButton.icon(
                 onPressed: () =>
@@ -293,8 +319,6 @@ class _Session {
   final RelayConfig relayConfig;
 }
 
-/// Web-compatible key storage using SharedPreferences (localStorage).
-/// FlutterSecureStorage hangs on web because it depends on a native keychain.
 class _SharedPrefsKeyStorage implements KeyStorage {
   _SharedPrefsKeyStorage(this._prefs);
   final SharedPreferences _prefs;
