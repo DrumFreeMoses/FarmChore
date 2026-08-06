@@ -1,36 +1,58 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'relay_config_native.dart'
+    if (dart.library.js_interop) 'relay_config_web.dart'
+    as platform;
+
+/// Where the relay URL and API key live.
+abstract class RelayConfigStore {
+  String? getString(String key);
+  Future<void> setString(String key, String value);
+  Future<void> remove(String key);
+}
 
 /// Persists the relay URL and API key across app restarts.
 class RelayConfig {
-  RelayConfig(this._prefs);
+  RelayConfig(this._store);
 
-  final SharedPreferences _prefs;
+  final RelayConfigStore _store;
   static const _urlKey = 'farmchore_relay_url';
   static const _apiKeyKey = 'farmchore_api_key';
 
-  /// The currently-configured relay URL, or null if not yet set.
-  String? get url => _prefs.getString(_urlKey);
+  String? get url => _store.getString(_urlKey);
+  String? get apiKey => _store.getString(_apiKeyKey);
 
-  /// The API key for relay authentication, or null if none.
-  String? get apiKey => _prefs.getString(_apiKeyKey);
+  Future<void> setUrl(String url) => _store.setString(_urlKey, url);
+  Future<void> setApiKey(String key) => _store.setString(_apiKeyKey, key);
 
-  /// Saves the relay URL (called after scanning a QR code).
-  Future<void> setUrl(String url) => _prefs.setString(_urlKey, url);
-
-  /// Saves the API key.
-  Future<void> setApiKey(String key) => _prefs.setString(_apiKeyKey, key);
-
-  /// Saves both URL and API key at once.
   Future<void> configure({required String url, String? apiKey}) async {
-    await _prefs.setString(_urlKey, url);
+    await _store.setString(_urlKey, url);
     if (apiKey != null) {
-      await _prefs.setString(_apiKeyKey, apiKey);
+      await _store.setString(_apiKeyKey, apiKey);
     }
   }
 
-  /// Clears the stored URL and key, reverting to build-time defaults.
   Future<void> clear() async {
-    await _prefs.remove(_urlKey);
-    await _prefs.remove(_apiKeyKey);
+    await _store.remove(_urlKey);
+    await _store.remove(_apiKeyKey);
   }
+
+  /// Creates a RelayConfig backed by the platform store.
+  static Future<RelayConfig> create() async =>
+      RelayConfig(await platform.createStore());
+
+  /// Creates a RelayConfig backed by an in-memory store (for tests).
+  static RelayConfig forTest() => RelayConfig(_MemoryStore());
+}
+
+/// In-memory store for tests — no platform dependencies.
+class _MemoryStore implements RelayConfigStore {
+  final _data = <String, String>{};
+
+  @override
+  String? getString(String key) => _data[key];
+
+  @override
+  Future<void> setString(String key, String value) async => _data[key] = value;
+
+  @override
+  Future<void> remove(String key) async => _data.remove(key);
 }

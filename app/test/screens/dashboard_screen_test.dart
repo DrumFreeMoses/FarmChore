@@ -10,7 +10,6 @@ import 'package:farm_chore/screens/dashboard_screen.dart';
 import 'package:farm_chore/screens/role_chores_screen.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:nostr/nostr.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 Future<ChoreRepository> seedRepository({Keys? keys, DateTime? today}) async {
   final db = await AppDatabase.openInMemory();
@@ -49,9 +48,7 @@ void main() {
     ChoreRepository repo, {
     DateTime? today,
   }) async {
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    final relayConfig = RelayConfig(prefs);
+    final relayConfig = RelayConfig.forTest();
     await tester.binding.setSurfaceSize(const Size(800, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(

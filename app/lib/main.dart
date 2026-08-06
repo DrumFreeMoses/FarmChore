@@ -14,7 +14,7 @@ import 'package:farm_chore/services/notification_service.dart';
 import 'package:farm_chore/sync/relay_connection.dart';
 import 'package:farm_chore/sync/sync_service.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web/web.dart' as web;
 
 const String _defaultRelay = String.fromEnvironment(
   'FARMCHORE_RELAY',
@@ -75,11 +75,9 @@ class _BootstrapState extends State<_Bootstrap> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final relayConfig = RelayConfig(prefs);
+      final relayConfig = await RelayConfig.create();
 
       if (relayConfig.url == null) {
-        // Show welcome screen inline — no Navigator.push.
         setState(() => _loading = false);
         return;
       }
@@ -96,18 +94,16 @@ class _BootstrapState extends State<_Bootstrap> {
   Future<void> _startSession(RelayConfig relayConfig) async {
     final relayUrl = relayConfig.url ?? _defaultRelay;
     final apiKey = relayConfig.apiKey;
-    print('[bootstrap] relay=$relayUrl');
+    debugPrint('[bootstrap] relay=$relayUrl');
 
-    final keyStorage = kIsWeb
-        ? _SharedPrefsKeyStorage(await SharedPreferences.getInstance())
-        : SecureKeyStorage();
-    print('[bootstrap] key storage ready');
+    final keyStorage = kIsWeb ? _LocalStorageKeyStorage() : SecureKeyStorage();
+    debugPrint('[bootstrap] key storage ready');
 
     final identity = await IdentityService(keyStorage).ensureIdentity();
-    print('[bootstrap] identity ready');
+    debugPrint('[bootstrap] identity ready');
 
     final database = await AppDatabase.open();
-    print('[bootstrap] database ready');
+    debugPrint('[bootstrap] database ready');
 
     final repository = ChoreRepository(database: database, keys: identity.keys);
     final sync = SyncService(
@@ -133,7 +129,7 @@ class _BootstrapState extends State<_Bootstrap> {
       );
     }
 
-    print('[bootstrap] done');
+    debugPrint('[bootstrap] done');
     setState(() {
       _session = _Session(
         repository: repository,
@@ -146,8 +142,7 @@ class _BootstrapState extends State<_Bootstrap> {
   }
 
   Future<void> _onRelaySelected(String relay, {String? apiKey}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final relayConfig = RelayConfig(prefs);
+    final relayConfig = await RelayConfig.create();
     await relayConfig.configure(url: relay, apiKey: apiKey);
     _sync?.stopLiveSubscription();
     _syncTimer?.cancel();
@@ -164,9 +159,7 @@ class _BootstrapState extends State<_Bootstrap> {
   @override
   Widget build(BuildContext context) {
     if (_loading && _session == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_session != null) {
@@ -178,10 +171,7 @@ class _BootstrapState extends State<_Bootstrap> {
       );
     }
 
-    return _WelcomeScreen(
-      onSelected: _onRelaySelected,
-      error: _error,
-    );
+    return _WelcomeScreen(onSelected: _onRelaySelected, error: _error);
   }
 }
 
@@ -267,10 +257,7 @@ class _WelcomeScreenState extends State<_WelcomeScreen> {
                     padding: const EdgeInsets.all(12),
                     child: Text(
                       widget.error!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -286,11 +273,10 @@ class _WelcomeScreenState extends State<_WelcomeScreen> {
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: () async {
-                  final relayConfig = RelayConfig(
-                    await SharedPreferences.getInstance(),
-                  );
+                  final navigator = Navigator.of(context);
+                  final relayConfig = await RelayConfig.create();
                   if (!mounted) return;
-                  final relay = await Navigator.of(context).push<String>(
+                  final relay = await navigator.push<String>(
                     MaterialPageRoute(
                       builder: (_) => JoinScreen(relayConfig: relayConfig),
                     ),
@@ -329,17 +315,17 @@ class _Session {
   final RelayConfig relayConfig;
 }
 
-class _SharedPrefsKeyStorage implements KeyStorage {
-  _SharedPrefsKeyStorage(this._prefs);
-  final SharedPreferences _prefs;
+/// Web-compatible key storage using localStorage directly via web package.
+class _LocalStorageKeyStorage implements KeyStorage {
   static const _key = 'farmchore_member_nsec';
+  static final _ls = web.window.localStorage;
 
   @override
-  Future<void> save(String nsec) => _prefs.setString(_key, nsec);
+  Future<void> save(String nsec) async => _ls.setItem(_key, nsec);
 
   @override
-  Future<String?> load() async => _prefs.getString(_key);
+  Future<String?> load() async => _ls.getItem(_key);
 
   @override
-  Future<void> clear() => _prefs.remove(_key);
+  Future<void> clear() async => _ls.removeItem(_key);
 }

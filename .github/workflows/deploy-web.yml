@@ -1,0 +1,41 @@
+name: deploy web
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: app
+      - run: flutter build web --release --base-href=/FarmChore/ --dart-define=FARMCHORE_RELAY_URL=wss://farmchore.fly.dev --dart-define=FARMCHORE_API_KEY=21b03470afde01c22075cadb597b6e1d
+        working-directory: app
+      - run: touch app/build/web/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/build/web
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

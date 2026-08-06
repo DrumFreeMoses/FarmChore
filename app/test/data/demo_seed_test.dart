@@ -8,7 +8,6 @@ import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/screens/dashboard_screen.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:nostr/nostr.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   final friday = DateTime(2026, 7, 31);
@@ -89,9 +88,7 @@ void main() {
     final db = await AppDatabase.openInMemory();
     addTearDown(db.close);
     final repo = ChoreRepository(database: db, keys: Keys.generate());
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    final relayConfig = RelayConfig(prefs);
+    final relayConfig = RelayConfig.forTest();
 
     await tester.binding.setSurfaceSize(const Size(800, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
