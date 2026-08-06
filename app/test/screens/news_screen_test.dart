@@ -46,7 +46,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('No heads-ups yet. Post the first one!'), findsOneWidget);
+    expect(find.text('No news yet. Post the first one!'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Add heads up'));
     await tester.pumpAndSettle();

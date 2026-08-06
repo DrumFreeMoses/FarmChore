@@ -1,13 +1,14 @@
 {
-    "name": "farm_chore",
-    "short_name": "farm_chore",
+    "name": "FarmChore for Jacob Springs Farm",
+    "short_name": "FarmChore",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#FAF6EF",
+    "theme_color": "#4E6B3A",
+    "description": "Chore management for Jacob Springs Farm",
+    "orientation": "any",
     "prefer_related_applications": false,
+    "categories": ["productivity", "utilities"],
     "icons": [
         {
             "src": "icons/Icon-192.png",

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:farm_chore/config/relay_config.dart';
 import 'package:farm_chore/data/chore_repository.dart';
 
 import 'dashboard_screen.dart';
@@ -14,11 +15,15 @@ class HomeShell extends StatefulWidget {
     super.key,
     required this.repository,
     required this.myPubkey,
+    required this.relayUrl,
+    required this.relayConfig,
     this.today,
   });
 
   final ChoreRepository repository;
   final String myPubkey;
+  final String relayUrl;
+  final RelayConfig relayConfig;
   final DateTime? today;
 
   @override
@@ -31,7 +36,12 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      DashboardScreen(repository: widget.repository, today: widget.today),
+      DashboardScreen(
+        repository: widget.repository,
+        today: widget.today,
+        relayUrl: widget.relayUrl,
+        relayConfig: widget.relayConfig,
+      ),
       MyChoresScreen(
         repository: widget.repository,
         myPubkey: widget.myPubkey,

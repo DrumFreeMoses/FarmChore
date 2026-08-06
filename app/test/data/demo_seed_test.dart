@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:farm_chore/config/relay_config.dart';
 import 'package:farm_chore/data/app_database.dart';
 import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/data/demo_seed.dart';
@@ -7,6 +8,7 @@ import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/screens/dashboard_screen.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:nostr/nostr.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   final friday = DateTime(2026, 7, 31);
@@ -87,21 +89,32 @@ void main() {
     final db = await AppDatabase.openInMemory();
     addTearDown(db.close);
     final repo = ChoreRepository(database: db, keys: Keys.generate());
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final relayConfig = RelayConfig(prefs);
 
     await tester.binding.setSurfaceSize(const Size(800, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
         theme: farmTheme(),
-        home: DashboardScreen(repository: repo, today: friday),
+        home: DashboardScreen(
+          repository: repo,
+          today: friday,
+          relayUrl: 'ws://localhost:7447',
+          relayConfig: relayConfig,
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
     // List mode shows the per-role empty state; grid mode shows headers.
-    await tester.tap(find.byTooltip('Show list'));
+    // Switch to list via menu.
+    await tester.tap(find.byTooltip('Show menu'));
     await tester.pumpAndSettle();
-    // Demo data is in the popup menu — open it first.
+    await tester.tap(find.text('Switch to list'));
+    await tester.pumpAndSettle();
+    // Demo data is in the popup menu — open it again.
     await tester.tap(find.byTooltip('Show menu'));
     await tester.pumpAndSettle();
     expect(find.text('Load demo data'), findsOneWidget);

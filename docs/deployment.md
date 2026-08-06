@@ -1,50 +1,67 @@
 # Deployment
 
-Three environments, all on free tiers (~$0/month):
+## Production (current)
 
-| Env    | Relay                                   | Web app          | Purpose                  |
-|--------|-----------------------------------------|------------------|--------------------------|
-| DEV    | fly.io `farmchore-dev` (ephemeral)      | Cloudflare Pages | Continuous integration   |
-| STAGING| fly.io `farmchore-staging`              | Cloudflare Pages | Release candidate        |
-| PROD   | fly.io `farmchore`                      | Cloudflare Pages | Live farm use            |
-
-## Relay (fly.io)
-
-The `relay/` directory contains a minimal NIP-01 relay (Go, pure-Go SQLite).
-
-Per-app fly config is generated from `relay/fly.toml` with a volume per
-environment:
+### Relay (fly.io)
 
 ```sh
-# one-time: create apps + volumes
-fly apps create farmchore-dev
-fly volumes create data --app farmchore-dev --size 1
-# deploy
-fly deploy --app farmchore-dev --config relay/fly.toml
+cd relay
+fly deploy --yes
+# Set API key (one-time):
+fly secrets set API_KEY=$(openssl rand -hex 16) --app farmchore
 ```
 
-Production relay URL: `wss://farmchore.fly.dev` (DEV/STAGING use their own
-subdomains). Clients take the relay URL + farm pubkey at onboarding.
+Relay URL: `wss://farmchore.fly.dev`
 
-## Web app (Cloudflare Pages)
+### Web app (GitHub Pages)
 
-`flutter build web` output (`app/build/web`) is deployed to Cloudflare Pages.
-The build runs in CI and publishes per branch:
+```sh
+cd app
+flutter build web --release \
+  --base-href /FarmChore/ \
+  --dart-define=FARMCHORE_RELAY=wss://farmchore.fly.dev \
+  --dart-define=FARMCHORE_API_KEY=<api-key>
 
-- `main` -> PROD
-- `staging` branch -> STAGING
-- PR previews -> DEV
+# Remove Flutter's built-in service worker (causes stale cache)
+rm -f build/web/flutter_service_worker.js
+python3 -c "
+import re
+with open('build/web/flutter_bootstrap.js', 'r') as f:
+    c = f.read()
+c = re.sub(r'serviceWorkerSettings:\s*\{[^}]+\}', '/* sw disabled */', c)
+with open('build/web/flutter_bootstrap.js', 'w') as f:
+    f.write(c)
+"
 
-## Mobile builds
+# Deploy
+rm -rf /tmp/gh-pages-deploy
+mkdir /tmp/gh-pages-deploy
+cp -r build/web/* /tmp/gh-pages-deploy/
+cd /tmp/gh-pages-deploy
+git init && git checkout -b gh-pages
+git add .
+git -c user.name="DrumFreeMoses" -c user.email="drumfreemoses@users.noreply.github.com" \
+  commit -m "Deploy FarmChore"
+git remote add origin https://github.com/DrumFreeMoses/FarmChore.git
+git push -f origin gh-pages
+rm -rf /tmp/gh-pages-deploy
+```
 
-- Android: `flutter build apk` / `appbundle` in CI on tags (issue #28)
-- iOS: macOS runner + TestFlight via `altool` in CI (issue #29)
+### Rotating the API key
 
-## Cost
+```sh
+fly secrets set API_KEY=$(openssl rand -hex 16) --app farmchore
+# Then rebuild web with new key and redeploy
+```
 
-| Item            | Cost/month |
-|-----------------|-----------|
-| fly.io (3 apps, free allowance) | $0 |
-| Cloudflare Pages | $0 |
-| GitHub Actions (public repo) | $0 |
-| **Total** | **$0** |
+## Environment tiers (planned)
+
+| Env    | Relay                          | Web app          | Purpose             |
+|--------|--------------------------------|------------------|---------------------|
+| PROD   | fly.io `farmchore`             | GitHub Pages     | Live farm use       |
+| DEV    | fly.io `farmchore-dev`         | GitHub Pages     | Testing             |
+
+## Mobile builds (Sprint 4)
+
+- Android: `flutter build apk` / `appbundle` (issue #28)
+- iOS: macOS runner + TestFlight (issue #29)

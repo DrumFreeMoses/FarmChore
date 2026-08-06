@@ -34,6 +34,7 @@ class ChoreInstance {
     this.completedAt,
     this.deferredTo,
     this.assignee,
+    this.dueTime,
   });
 
   final DateTime date;
@@ -46,6 +47,41 @@ class ChoreInstance {
   final DateTime? deferredTo;
   final String? assignee;
 
+  /// Optional due time in "HH:MM" format (e.g. "06:00").
+  final String? dueTime;
+
+  /// Whether this chore has a scheduled due time.
+  bool get hasSchedule => dueTime != null;
+
+  /// Whether this chore is overdue (past due time and still open).
+  bool get isOverdue {
+    if (!hasSchedule || !status.isOpen) return false;
+    final now = DateTime.now();
+    if (!isSameDay(now, date)) return false;
+    return _nowMinutes > _dueMinutes;
+  }
+
+  /// Minutes past due (positive = overdue, negative = not yet due).
+  int get minutesOverdue {
+    if (!hasSchedule || !status.isOpen) return 0;
+    final now = DateTime.now();
+    if (!isSameDay(now, date)) return 0;
+    return _nowMinutes - _dueMinutes;
+  }
+
+  int get _dueMinutes {
+    final parts = dueTime!.split(':');
+    return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+  }
+
+  int get _nowMinutes {
+    final now = DateTime.now();
+    return now.hour * 60 + now.minute;
+  }
+
+  static bool isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
   /// Canonical addressable id: `date|role|slug` (NIP-01 `d` tag).
   String get dTag => '${_isoDate(date)}|${role.id}|$slug';
 
@@ -56,6 +92,7 @@ class ChoreInstance {
     String? assignee,
     ChoreType? type,
     String? title,
+    String? dueTime,
   }) {
     return ChoreInstance(
       date: date,
@@ -67,6 +104,7 @@ class ChoreInstance {
       completedAt: completedAt ?? this.completedAt,
       deferredTo: deferredTo ?? this.deferredTo,
       assignee: assignee ?? this.assignee,
+      dueTime: dueTime ?? this.dueTime,
     );
   }
 
@@ -104,6 +142,7 @@ class ChoreInstance {
       'type': type.name,
       'status': status.name,
       if (deferredTo != null) 'deferredTo': _isoDate(deferredTo!),
+      if (dueTime != null) 'dueTime': dueTime,
     });
     return NostrEvent(
       pubKey: pubKey,
@@ -168,6 +207,7 @@ class ChoreInstance {
     final status = ChoreStatus.values.asNameMap()[decoded['status']];
     final type = ChoreType.values.asNameMap()[decoded['type']];
     final deferredTo = decoded['deferredTo'];
+    final dueTime = decoded['dueTime'] as String?;
     return ChoreInstance(
       date: _parseIsoDate(date),
       role: role,
@@ -177,6 +217,7 @@ class ChoreInstance {
       status: status ?? ChoreStatus.open,
       deferredTo: deferredTo is String ? _parseIsoDate(deferredTo) : null,
       assignee: assignee,
+      dueTime: dueTime,
     );
   }
 }

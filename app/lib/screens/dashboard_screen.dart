@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:farm_chore/config/relay_config.dart';
 import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/data/demo_seed.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
+import 'package:farm_chore/domain/heads_up.dart';
 import 'package:farm_chore/domain/roles.dart';
 import 'package:farm_chore/screens/invite_screen.dart';
 import 'package:farm_chore/screens/morning_meeting_screen.dart';
 import 'package:farm_chore/screens/notification_screen.dart';
+import 'package:farm_chore/screens/settings_screen.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:farm_chore/widgets/chore_card.dart';
 import 'package:farm_chore/widgets/new_item_dialog.dart';
@@ -18,9 +21,17 @@ import 'role_chores_screen.dart';
 /// Landing page: one card per role showing today's done/open counts.
 /// Tapping a card drills into that role's chore list.
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key, required this.repository, this.today});
+  const DashboardScreen({
+    super.key,
+    required this.repository,
+    required this.relayUrl,
+    required this.relayConfig,
+    this.today,
+  });
 
   final ChoreRepository repository;
+  final String relayUrl;
+  final RelayConfig relayConfig;
 
   /// Injected for tests; defaults to the current day.
   final DateTime? today;
@@ -147,6 +158,108 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _openMorningMeeting() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MorningMeetingScreen(
+          repository: widget.repository,
+          myPubkey: widget.repository.myPubkey,
+        ),
+      ),
+    );
+    _refresh();
+  }
+
+  void _openInvite() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => InviteScreen(
+          relayUrl: widget.relayUrl,
+          apiKey: widget.relayConfig.apiKey,
+          farmPubkey:
+              widget.repository.farmPubkey ?? widget.repository.myPubkey,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendQuickAlert() async {
+    final textController = TextEditingController();
+    FarmRole? scope;
+    final posted = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber, color: FarmColors.error),
+              const SizedBox(width: 8),
+              const Text('Send alert'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: textController,
+                  autofocus: true,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Alert message',
+                    hintText: 'e.g. Water pipe burst in the parlor!',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<FarmRole?>(
+                  initialValue: scope,
+                  decoration: const InputDecoration(labelText: 'Send to'),
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('Whole farm'),
+                    ),
+                    for (final role in FarmRoles.all)
+                      DropdownMenuItem(
+                        value: role,
+                        child: Text(role.displayName),
+                      ),
+                  ],
+                  onChanged: (value) => setDialogState(() => scope = value),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(backgroundColor: FarmColors.error),
+              child: const Text('Send alert'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (posted != true || !mounted) return;
+    final text = textController.text.trim();
+    if (text.isEmpty) return;
+    await widget.repository.saveHeadsUp(
+      text,
+      scope: scope,
+      type: HeadsUpType.alert,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Alert sent')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -154,51 +267,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: const Text('FarmChore for Jacob Springs Farm'),
         actions: [
           SyncStatusBadge(repository: widget.repository, onSync: _refresh),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'load_demo') _loadDemoData();
-              if (value == 'reset_all') _resetAllData();
-            },
-            itemBuilder: (_) => [
-              if (!_hasDefaults)
-                const PopupMenuItem(
-                  value: 'load_demo',
-                  child: ListTile(
-                    leading: Icon(Icons.agriculture),
-                    title: Text('Load demo data'),
-                    dense: true,
-                  ),
-                ),
-              const PopupMenuItem(
-                value: 'reset_all',
-                child: ListTile(
-                  leading: Icon(Icons.delete_forever, color: FarmColors.error),
-                  title: Text('Reset all data'),
-                  dense: true,
-                ),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: Icon(_gridMode ? Icons.view_list : Icons.grid_view),
-            tooltip: _gridMode ? 'Show list' : 'Show grid',
-            onPressed: () => setState(() => _gridMode = !_gridMode),
-          ),
-          IconButton(
-            icon: const Icon(Icons.groups),
-            tooltip: 'Morning meeting',
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => MorningMeetingScreen(
-                    repository: widget.repository,
-                    myPubkey: widget.repository.myPubkey,
-                  ),
-                ),
-              );
-              _refresh();
-            },
-          ),
           IconButton(
             icon: Badge(
               isLabelVisible: _unreadCount > 0,
@@ -216,29 +284,93 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _refresh();
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.badge_outlined),
-            tooltip: 'Your name',
-            onPressed: _editName,
-          ),
-          IconButton(
-            icon: const Icon(Icons.qr_code),
-            tooltip: 'Invite via QR',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => InviteScreen(
-                    relayUrl: const String.fromEnvironment(
-                      'FARMCHORE_RELAY',
-                      defaultValue: 'ws://localhost:7447',
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'send_alert') _sendQuickAlert();
+              if (value == 'load_demo') _loadDemoData();
+              if (value == 'grid_list') setState(() => _gridMode = !_gridMode);
+              if (value == 'morning_meeting') _openMorningMeeting();
+              if (value == 'your_name') _editName();
+              if (value == 'invite_qr') _openInvite();
+              if (value == 'settings') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SettingsScreen(
+                      relayConfig: widget.relayConfig,
+                      relayUrl: widget.relayUrl,
                     ),
-                    farmPubkey:
-                        widget.repository.farmPubkey ??
-                        widget.repository.myPubkey,
+                  ),
+                );
+              }
+              if (value == 'reset_all') _resetAllData();
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'send_alert',
+                child: ListTile(
+                  leading: Icon(Icons.warning_amber, color: FarmColors.error),
+                  title: Text('Send alert'),
+                  dense: true,
+                ),
+              ),
+              if (!_hasDefaults)
+                const PopupMenuItem(
+                  value: 'load_demo',
+                  child: ListTile(
+                    leading: Icon(Icons.agriculture),
+                    title: Text('Load demo data'),
+                    dense: true,
                   ),
                 ),
-              );
-            },
+              PopupMenuItem(
+                value: 'grid_list',
+                child: ListTile(
+                  leading: Icon(_gridMode ? Icons.view_list : Icons.grid_view),
+                  title: Text(_gridMode ? 'Switch to list' : 'Switch to grid'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'morning_meeting',
+                child: ListTile(
+                  leading: Icon(Icons.groups),
+                  title: Text('Morning meeting'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'your_name',
+                child: ListTile(
+                  leading: Icon(Icons.badge_outlined),
+                  title: Text('Your name'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'invite_qr',
+                child: ListTile(
+                  leading: Icon(Icons.qr_code),
+                  title: Text('Invite via QR'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'settings',
+                child: ListTile(
+                  leading: Icon(Icons.settings),
+                  title: Text('Settings'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'reset_all',
+                child: ListTile(
+                  leading: Icon(Icons.delete_forever, color: FarmColors.error),
+                  title: Text('Reset all data'),
+                  dense: true,
+                ),
+              ),
+            ],
           ),
         ],
       ),

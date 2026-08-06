@@ -129,6 +129,9 @@ class ChoreRepository {
     String title, {
     String description = '',
     List<String> checklist = const [],
+    String? dueTime,
+    int? reminderMinutes,
+    int? escalationMinutes,
   }) async {
     final sets = await loadBaseRoleDefaultSets();
     final set = sets.where((s) => s.role == role).firstOrNull;
@@ -142,6 +145,9 @@ class ChoreRepository {
             weekdays: const [1, 2, 3, 4, 5, 6, 7],
             description: description,
             checklist: checklist,
+            dueTime: dueTime,
+            reminderMinutes: reminderMinutes,
+            escalationMinutes: escalationMinutes,
           ),
         ],
       ),
@@ -298,7 +304,12 @@ class ChoreRepository {
   }
 
   /// Posts a heads-up notice for the farm or one role group (kind 31505).
-  Future<void> saveHeadsUp(String text, {FarmRole? scope}) async {
+  Future<void> saveHeadsUp(
+    String text, {
+    FarmRole? scope,
+    HeadsUpType type = HeadsUpType.news,
+    String? escalationTag,
+  }) async {
     final now = _now();
     await _persist(
       HeadsUp(
@@ -306,6 +317,8 @@ class ChoreRepository {
         author: myPubkey,
         createdAt: now,
         scope: scope,
+        type: type,
+        escalationTag: escalationTag,
       ).toNostrEvent(pubKey: myPubkey, createdAt: now, farmPubkey: farmPubkey),
     );
   }

@@ -45,6 +45,7 @@ abstract final class DailyGenerator {
             slug: slugify(chore.title),
             title: chore.title,
             assignee: assignee,
+            dueTime: chore.dueTime,
           ),
         );
       }
@@ -73,6 +74,7 @@ abstract final class DailyGenerator {
             title: instance.title,
             type: instance.type,
             assignee: instance.assignee,
+            dueTime: instance.dueTime,
           ),
         );
       }

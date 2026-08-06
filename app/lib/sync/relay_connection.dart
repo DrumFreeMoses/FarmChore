@@ -21,14 +21,24 @@ abstract interface class RelayConnection {
 
 /// WebSocket-backed connection to a FarmChore relay.
 class WebSocketRelayConnection implements RelayConnection {
-  WebSocketRelayConnection(this.url);
+  WebSocketRelayConnection(this.url, {this.apiKey});
 
   final String url;
+  final String? apiKey;
   WebSocketChannel? _channel;
 
   @override
   Future<void> connect() async {
-    final channel = WebSocketChannel.connect(Uri.parse(url));
+    // Append API key as query parameter if provided.
+    var connectUrl = url;
+    if (apiKey != null && apiKey!.isNotEmpty) {
+      final uri = Uri.parse(url);
+      final withKey = uri.replace(
+        queryParameters: {...uri.queryParameters, 'key': apiKey},
+      );
+      connectUrl = withKey.toString();
+    }
+    final channel = WebSocketChannel.connect(Uri.parse(connectUrl));
     await channel.ready;
     _channel = channel;
   }

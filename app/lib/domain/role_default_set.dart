@@ -15,6 +15,9 @@ class ChoreDefault {
     this.requiredSkills = const [],
     this.description = '',
     this.checklist = const [],
+    this.dueTime,
+    this.reminderMinutes,
+    this.escalationMinutes,
   });
 
   final String title;
@@ -33,6 +36,20 @@ class ChoreDefault {
   /// Standard checklist items for this chore.
   final List<String> checklist;
 
+  /// Optional due time in "HH:MM" format (e.g. "06:00").
+  /// When set, the chore is expected to be done by this time each day.
+  final String? dueTime;
+
+  /// Minutes after [dueTime] before a reminder is sent to the assigned person.
+  /// Null means no reminder.
+  final int? reminderMinutes;
+
+  /// Minutes after [dueTime] before the issue escalates to the team (role).
+  /// Null means no escalation.
+  final int? escalationMinutes;
+
+  bool get hasSchedule => dueTime != null;
+
   bool runsOnWeekday(DateTime date) => weekdays.contains(date.weekday);
 
   ChoreDefault copyWith({
@@ -40,6 +57,9 @@ class ChoreDefault {
     List<String>? requiredSkills,
     String? description,
     List<String>? checklist,
+    String? dueTime,
+    int? reminderMinutes,
+    int? escalationMinutes,
   }) => ChoreDefault(
     title: title,
     weekdays: weekdays,
@@ -47,6 +67,9 @@ class ChoreDefault {
     requiredSkills: requiredSkills ?? this.requiredSkills,
     description: description ?? this.description,
     checklist: checklist ?? this.checklist,
+    dueTime: dueTime ?? this.dueTime,
+    reminderMinutes: reminderMinutes ?? this.reminderMinutes,
+    escalationMinutes: escalationMinutes ?? this.escalationMinutes,
   );
 
   Map<String, dynamic> toJson() => {
@@ -56,6 +79,9 @@ class ChoreDefault {
     if (requiredSkills.isNotEmpty) 'requiredSkills': requiredSkills,
     if (description.isNotEmpty) 'description': description,
     if (checklist.isNotEmpty) 'checklist': checklist,
+    if (dueTime != null) 'dueTime': dueTime,
+    if (reminderMinutes != null) 'reminderMinutes': reminderMinutes,
+    if (escalationMinutes != null) 'escalationMinutes': escalationMinutes,
   };
 
   factory ChoreDefault.fromJson(Map<String, dynamic> json) {
@@ -81,6 +107,9 @@ class ChoreDefault {
       requiredSkills: requiredSkills,
       description: (json['description'] as String?) ?? '',
       checklist: checklist,
+      dueTime: json['dueTime'] as String?,
+      reminderMinutes: json['reminderMinutes'] as int?,
+      escalationMinutes: json['escalationMinutes'] as int?,
     );
   }
 }

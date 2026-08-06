@@ -40,13 +40,45 @@ class ChoreCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final done = instance.status == ChoreStatus.done;
+    final overdue = instance.isOverdue;
+    final hasSchedule = instance.hasSchedule;
+    final minutesOverdue = instance.minutesOverdue;
+
+    // Escalation color: yellow → orange → red based on how overdue.
+    Color? escalationColor;
+    String? escalationLabel;
+    if (overdue && !done) {
+      if (minutesOverdue > 120) {
+        escalationColor = FarmColors.error;
+        escalationLabel = '${minutesOverdue ~/ 60}h overdue';
+      } else if (minutesOverdue > 30) {
+        escalationColor = const Color(0xFFE65100); // deep orange
+        escalationLabel = '${minutesOverdue}min overdue';
+      } else {
+        escalationColor = FarmColors.hayYellow;
+        escalationLabel = 'Due ${instance.dueTime}';
+      }
+    } else if (hasSchedule && !done) {
+      escalationColor = FarmColors.cottonwoodGreen;
+      escalationLabel = 'Due ${instance.dueTime}';
+    }
+
     final card = Card(
       elevation: _isChore ? 2 : 0,
-      color: done ? FarmColors.sabbath.withValues(alpha: 0.18) : null,
+      color: done
+          ? FarmColors.sabbath.withValues(alpha: 0.18)
+          : overdue
+          ? FarmColors.error.withAlpha(12)
+          : null,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(_isChore ? 8 : 16),
         side: _isChore
-            ? BorderSide.none
+            ? overdue
+                  ? BorderSide(
+                      color: FarmColors.error.withValues(alpha: 0.5),
+                      width: 1.5,
+                    )
+                  : BorderSide.none
             : const BorderSide(color: FarmColors.springBlue, width: 1.5),
       ),
       child: InkWell(
@@ -56,7 +88,7 @@ class ChoreCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              _Badge(isChore: _isChore),
+              _Badge(isChore: _isChore, overdue: overdue),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -76,6 +108,29 @@ class ChoreCard extends StatelessWidget {
                         'Assigned: $_assigneeLabel',
                         style: textTheme.bodySmall?.copyWith(
                           color: FarmColors.soilBrown.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    if (escalationLabel != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              overdue ? Icons.access_time : Icons.schedule,
+                              size: 12,
+                              color: escalationColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              escalationLabel,
+                              style: textTheme.labelSmall?.copyWith(
+                                color: escalationColor,
+                                fontWeight: overdue
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                   ],
@@ -104,17 +159,23 @@ class ChoreCard extends StatelessWidget {
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge({required this.isChore});
+  const _Badge({required this.isChore, this.overdue = false});
 
   final bool isChore;
+  final bool overdue;
 
   @override
   Widget build(BuildContext context) {
+    final color = overdue
+        ? FarmColors.error
+        : isChore
+        ? FarmColors.dawnAmber
+        : FarmColors.springBlue;
     return Container(
       width: 12,
       height: 12,
       decoration: BoxDecoration(
-        color: isChore ? FarmColors.dawnAmber : FarmColors.springBlue,
+        color: color,
         borderRadius: isChore ? BorderRadius.zero : BorderRadius.circular(4),
       ),
     );

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -13,6 +15,7 @@ import (
 type Relay struct {
 	store *Store
 	up    websocket.Upgrader
+	apiKey string
 
 	mu      sync.Mutex
 	clients map[*client]bool
@@ -32,6 +35,7 @@ func NewRelay(path string) *Relay {
 	}
 	r := &Relay{
 		store:   store,
+		apiKey:  os.Getenv("API_KEY"),
 		clients: map[*client]bool{},
 		up: websocket.Upgrader{
 			CheckOrigin: func(*http.Request) bool { return true },
@@ -43,6 +47,20 @@ func NewRelay(path string) *Relay {
 func (r *Relay) Close() { r.store.Close() }
 
 func (r *Relay) HandleWebSocket(w http.ResponseWriter, req *http.Request) {
+	// Authenticate if API_KEY is configured.
+	if r.apiKey != "" {
+		key := req.URL.Query().Get("key")
+		if key == "" {
+			// Also check Authorization header.
+			key = req.Header.Get("Authorization")
+			key = strings.TrimPrefix(key, "Bearer ")
+		}
+		if key != r.apiKey {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	conn, err := r.up.Upgrade(w, req, nil)
 	if err != nil {
 		log.Printf("upgrade: %v", err)

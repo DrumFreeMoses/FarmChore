@@ -44,6 +44,10 @@ dependencies:
   path_provider: ^2.1.6
   web_socket_channel: ^3.0.3
   qr_flutter: ^4.1.0
+  mobile_scanner: ^7.4.0
+  shared_preferences: ^2.5.5
+  url_launcher: ^6.3.2
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

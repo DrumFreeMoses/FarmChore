@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:farm_chore/config/relay_config.dart';
 import 'package:farm_chore/data/app_database.dart';
 import 'package:farm_chore/data/chore_repository.dart';
 import 'package:farm_chore/domain/chore_instance.dart';
@@ -9,6 +10,7 @@ import 'package:farm_chore/screens/dashboard_screen.dart';
 import 'package:farm_chore/screens/role_chores_screen.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:nostr/nostr.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<ChoreRepository> seedRepository({Keys? keys, DateTime? today}) async {
   final db = await AppDatabase.openInMemory();
@@ -47,12 +49,20 @@ void main() {
     ChoreRepository repo, {
     DateTime? today,
   }) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final relayConfig = RelayConfig(prefs);
     await tester.binding.setSurfaceSize(const Size(800, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
         theme: farmTheme(),
-        home: DashboardScreen(repository: repo, today: today ?? friday),
+        home: DashboardScreen(
+          repository: repo,
+          today: today ?? friday,
+          relayUrl: 'ws://localhost:7447',
+          relayConfig: relayConfig,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -62,7 +72,10 @@ void main() {
     final repo = await seedRepository(today: friday);
     addTearDown(repo.database.close);
     await pumpDashboard(tester, repo);
-    await tester.tap(find.byTooltip('Show list'));
+    // Switch to list view via menu.
+    await tester.tap(find.byTooltip('Show menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Switch to list'));
     await tester.pumpAndSettle();
 
     expect(find.text("Milker's Chores"), findsOneWidget);
@@ -95,18 +108,22 @@ void main() {
     await pumpDashboard(tester, repo);
 
     // Grid is the default view and lists every chore two-up.
-    expect(find.byTooltip('Show list'), findsOneWidget);
     expect(find.text('Morning milking'), findsOneWidget);
     expect(find.text('Clean stalls'), findsOneWidget);
     expect(find.text('3 open'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Show list'));
+    // Switch to list via menu.
+    await tester.tap(find.byTooltip('Show menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Switch to list'));
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Show grid'), findsOneWidget);
     expect(find.text('Morning milking'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Show grid'));
+    // Switch back to grid via menu.
+    await tester.tap(find.byTooltip('Show menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Switch to grid'));
     await tester.pumpAndSettle();
 
     expect(find.text('Morning milking'), findsOneWidget);
@@ -135,7 +152,10 @@ void main() {
     await repo.assign(instance, repo.myPubkey);
     await pumpDashboard(tester, repo);
 
-    await tester.tap(find.byTooltip('Your name'));
+    // Open name dialog via menu.
+    await tester.tap(find.byTooltip('Show menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Your name'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextField, 'First name'),

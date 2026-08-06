@@ -4,23 +4,29 @@ import 'package:flutter/material.dart';
 import 'package:farm_chore/theme/farm_theme.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-/// Displays a QR code that encodes the relay URL and farm pubkey so new
-/// members can scan it to join the farm's ChoreChore instance.
+/// Displays a QR code that encodes the relay URL, API key, and farm pubkey
+/// so new members can scan it to join the farm's FarmChore instance.
 class InviteScreen extends StatelessWidget {
   const InviteScreen({
     super.key,
     required this.relayUrl,
     required this.farmPubkey,
+    this.apiKey,
     this.farmName = 'Jacob Springs Farm',
   });
 
   final String relayUrl;
   final String farmPubkey;
+  final String? apiKey;
   final String farmName;
 
-  /// The data encoded in the QR code: a JSON object with relay and pubkey.
-  String get _qrData =>
-      jsonEncode({'relay': relayUrl, 'pubkey': farmPubkey, 'name': farmName});
+  /// The data encoded in the QR code: a JSON object with relay, key, and pubkey.
+  String get _qrData => jsonEncode({
+    'relay': relayUrl,
+    if (apiKey != null) 'key': apiKey,
+    'pubkey': farmPubkey,
+    'name': farmName,
+  });
 
   @override
   Widget build(BuildContext context) {

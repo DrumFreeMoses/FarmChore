@@ -6,6 +6,9 @@ import '../nostr/nostr_event.dart';
 /// Kind for a farm heads-up notice (weather, alerts, reminders, news).
 const int headsUpKind = 31505;
 
+/// Type of heads-up: casual news vs urgent alert.
+enum HeadsUpType { news, alert }
+
 /// A short farm notice (kind 31505). Scoped to the whole farm or to one
 /// role group; authored by any member.
 class HeadsUp {
@@ -14,6 +17,8 @@ class HeadsUp {
     required this.author,
     required this.createdAt,
     this.scope,
+    this.type = HeadsUpType.news,
+    this.escalationTag,
   });
 
   final String text;
@@ -26,10 +31,19 @@ class HeadsUp {
   /// Null = farm-wide; a role id = for that role's group.
   final FarmRole? scope;
 
+  /// News (casual) or alert (urgent, gets a red treatment).
+  final HeadsUpType type;
+
+  /// Optional tag linking this heads-up to a chore escalation
+  /// (e.g. "escalation|2026-08-05|milkers|milk-cows").
+  /// Prevents duplicate escalation posts for the same chore.
+  final String? escalationTag;
+
   /// Addressable id: author + creation time (unique per author per second).
   String get dTag => '$author-$createdAt';
 
   bool get isFarmWide => scope == null;
+  bool get isAlert => type == HeadsUpType.alert;
 
   NostrEvent toNostrEvent({
     required String pubKey,
@@ -45,9 +59,13 @@ class HeadsUp {
         ['d', dTag],
         if (scope != null) ['role', scope!.id],
         if (farmPubkey != null) ['farm', farmPubkey],
+        if (escalationTag != null) ['escalation', escalationTag!],
         ...extraTags,
       ],
-      content: jsonEncode({'text': text}),
+      content: jsonEncode({
+        'text': text,
+        if (type == HeadsUpType.alert) 'type': 'alert',
+      }),
     );
   }
 
@@ -71,11 +89,19 @@ class HeadsUp {
         .where((t) => t.first == 'role')
         .map((t) => t[1])
         .firstOrNull;
+    final typeName = decoded['type'] as String?;
+    final type = typeName == 'alert' ? HeadsUpType.alert : HeadsUpType.news;
+    final escalationTag = event.tags
+        .where((t) => t.first == 'escalation')
+        .map((t) => t[1])
+        .firstOrNull;
     return HeadsUp(
       text: text,
       author: event.pubKey,
       createdAt: event.createdAt,
       scope: roleId == null ? null : FarmRole.fromIdOrNull(roleId),
+      type: type,
+      escalationTag: escalationTag,
     );
   }
 }

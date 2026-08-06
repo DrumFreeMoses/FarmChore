@@ -41,7 +41,10 @@ class _NewItemDialogState extends State<NewItemDialog> {
   String? _assignee;
   bool _addToDefault = false;
   List<String> _members = [];
-  List<String> _checklist = [];
+  final List<String> _checklist = [];
+  String? _dueTime;
+  final _reminderMinutes = TextEditingController();
+  final _escalationMinutes = TextEditingController();
 
   @override
   void initState() {
@@ -81,11 +84,16 @@ class _NewItemDialogState extends State<NewItemDialog> {
     await widget.repository.saveInstance(instance);
     if (_addToDefault && _type == ChoreType.chore) {
       final desc = _description.text.trim();
+      final reminder = int.tryParse(_reminderMinutes.text.trim());
+      final escalation = int.tryParse(_escalationMinutes.text.trim());
       await widget.repository.addDefaultChore(
         _role,
         title,
         description: desc,
         checklist: _checklist,
+        dueTime: _dueTime,
+        reminderMinutes: reminder,
+        escalationMinutes: escalation,
       );
       await widget.repository.syncDayToDefaults(_date);
     }
@@ -185,6 +193,43 @@ class _NewItemDialogState extends State<NewItemDialog> {
               ),
             if (showDefaultFields) ...[
               const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.access_time),
+                title: Text(_dueTime ?? 'No due time set'),
+                subtitle: const Text(
+                  'Optional: when this chore is due each day',
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_dueTime != null)
+                      IconButton(
+                        icon: const Icon(Icons.clear, size: 16),
+                        onPressed: () => setState(() => _dueTime = null),
+                      ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: _dueTime != null
+                        ? TimeOfDay(
+                            hour: int.parse(_dueTime!.split(':')[0]),
+                            minute: int.parse(_dueTime!.split(':')[1]),
+                          )
+                        : const TimeOfDay(hour: 8, minute: 0),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      _dueTime =
+                          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: _description,
                 maxLines: 3,
@@ -240,6 +285,33 @@ class _NewItemDialogState extends State<NewItemDialog> {
                   ),
                 ],
               ),
+              if (_dueTime != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Escalation',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _reminderMinutes,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Reminder (minutes before due)',
+                    hintText: 'e.g. 15',
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _escalationMinutes,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Escalation (minutes after due)',
+                    hintText: 'e.g. 30',
+                    isDense: true,
+                  ),
+                ),
+              ],
             ],
           ],
         ),
