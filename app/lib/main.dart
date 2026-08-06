@@ -63,7 +63,13 @@ class _Bootstrap extends StatefulWidget {
 class _BootstrapState extends State<_Bootstrap> {
   Timer? _syncTimer;
   SyncService? _sync;
-  late final Future<_Session> _session = _open();
+  Future<_Session>? _session;
+
+  @override
+  void initState() {
+    super.initState();
+    _session = _open();
+  }
 
   Future<_Session> _open() async {
     final prefs = await SharedPreferences.getInstance();
@@ -74,15 +80,25 @@ class _BootstrapState extends State<_Bootstrap> {
       if (!mounted) return Future.error(StateError('unmounted'));
       final chosen = await Navigator.of(context).push<String>(
         MaterialPageRoute(
-          builder: (_) => const _WelcomeScreen(),
+          builder: (_) => _WelcomeScreen(
+            onSelected: (relay, key) async {
+              await relayConfig.configure(url: relay, apiKey: key);
+              if (mounted) {
+                Navigator.of(context).pop(relay);
+              }
+            },
+          ),
         ),
       );
       if (chosen == null) {
-        // User backed out — stay on welcome screen.
         return Future.error(StateError('no relay chosen'));
       }
     }
 
+    return _bootstrap(relayConfig);
+  }
+
+  Future<_Session> _bootstrap(RelayConfig relayConfig) async {
     final relayUrl = relayConfig.url ?? _defaultRelay;
     final apiKey = relayConfig.apiKey;
     final identity = await IdentityService(SecureKeyStorage()).ensureIdentity();
@@ -122,6 +138,14 @@ class _BootstrapState extends State<_Bootstrap> {
     );
   }
 
+  void _retry() {
+    _sync?.stopLiveSubscription();
+    _syncTimer?.cancel();
+    setState(() {
+      _session = _open();
+    });
+  }
+
   @override
   void dispose() {
     _syncTimer?.cancel();
@@ -135,7 +159,14 @@ class _BootstrapState extends State<_Bootstrap> {
       future: _session,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const _WelcomeScreen();
+          return _WelcomeScreen(
+            onSelected: (relay, key) async {
+              final prefs = await SharedPreferences.getInstance();
+              final relayConfig = RelayConfig(prefs);
+              await relayConfig.configure(url: relay, apiKey: key);
+              _retry();
+            },
+          );
         }
         if (!snapshot.hasData) {
           return const Scaffold(
@@ -154,32 +185,31 @@ class _BootstrapState extends State<_Bootstrap> {
   }
 }
 
-/// Welcome screen shown on first launch: join via QR or set up as owner.
+/// Callback when a relay is selected: (relayUrl, apiKey?).
+typedef OnRelaySelected = Future<void> Function(String relay, String? apiKey);
+
+/// Welcome screen shown on first launch or after error.
 class _WelcomeScreen extends StatefulWidget {
-  const _WelcomeScreen();
+  const _WelcomeScreen({required this.onSelected});
+
+  final OnRelaySelected onSelected;
 
   @override
   State<_WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
 class _WelcomeScreenState extends State<_WelcomeScreen> {
-  RelayConfig? _relayConfig;
+  bool _loading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadConfig();
-  }
-
-  Future<void> _loadConfig() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) setState(() => _relayConfig = RelayConfig(prefs));
+  Future<void> _select(String relay, {String? apiKey}) async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    await widget.onSelected(relay, apiKey);
   }
 
   @override
   Widget build(BuildContext context) {
-    final relayConfig = _relayConfig;
-    if (relayConfig == null) {
+    if (_loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
@@ -208,29 +238,25 @@ class _WelcomeScreenState extends State<_WelcomeScreen> {
               ),
               const SizedBox(height: 48),
               FilledButton.icon(
-                onPressed: () async {
-                  // Connect to the production relay with the built-in API key.
-                  await relayConfig.configure(
-                    url: _productionRelay,
-                    apiKey: _productionApiKey,
-                  );
-                  if (context.mounted) {
-                    Navigator.of(context).pop(_productionRelay);
-                  }
-                },
+                onPressed: () =>
+                    _select(_productionRelay, apiKey: _productionApiKey),
                 icon: const Icon(Icons.person_add),
                 label: const Text('Set up as farm owner'),
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: () async {
+                  final relayConfig = RelayConfig(
+                    await SharedPreferences.getInstance(),
+                  );
+                  if (!mounted) return;
                   final relay = await Navigator.of(context).push<String>(
                     MaterialPageRoute(
                       builder: (_) => JoinScreen(relayConfig: relayConfig),
                     ),
                   );
-                  if (relay != null && context.mounted) {
-                    Navigator.of(context).pop(relay);
+                  if (relay != null && mounted) {
+                    await _select(relay);
                   }
                 },
                 icon: const Icon(Icons.qr_code_scanner),
@@ -238,12 +264,7 @@ class _WelcomeScreenState extends State<_WelcomeScreen> {
               ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: () async {
-                  await relayConfig.setUrl(_defaultRelay);
-                  if (context.mounted) {
-                    Navigator.of(context).pop(_defaultRelay);
-                  }
-                },
+                onPressed: () => _select(_defaultRelay),
                 child: const Text('Use local relay (dev only)'),
               ),
             ],
