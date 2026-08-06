@@ -47,6 +47,9 @@ self.addEventListener('fetch', (event) => {
   if (url.protocol === 'ws:' || url.protocol === 'wss:') return;
   if (url.pathname.startsWith('/api/')) return;
 
+  // Never cache sw.js itself — always fetch fresh so updates propagate.
+  if (url.pathname.endsWith('sw.js')) return;
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;

@@ -27,10 +27,20 @@
     // Register the service worker for offline caching and background notifications.
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').then((reg) => {
-          console.log('Service worker registered:', reg.scope);
-        }).catch((err) => {
-          console.warn('Service worker registration failed:', err);
+        // Cache-bust sw.js so hard refresh always gets the latest version.
+        fetch('./version.json').then(r => r.json()).then(v => {
+          const swUrl = './sw.js?v=' + (v.build || Date.now());
+          navigator.serviceWorker.register(swUrl).then((reg) => {
+            console.log('Service worker registered:', reg.scope);
+          }).catch((err) => {
+            console.warn('Service worker registration failed:', err);
+          });
+        }).catch(() => {
+          navigator.serviceWorker.register('./sw.js').then((reg) => {
+            console.log('Service worker registered:', reg.scope);
+          }).catch((err) => {
+            console.warn('Service worker registration failed:', err);
+          });
         });
       });
     }
