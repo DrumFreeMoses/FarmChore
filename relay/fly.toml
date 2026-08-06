@@ -12,6 +12,7 @@ primary_region = 'dfw'
 [env]
   ADDR = ':8080'
   DATABASE_PATH = '/data/farmchore.db'
+  WEB_DIR = '/web'
 
 [[mounts]]
   source = 'data'

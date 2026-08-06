@@ -8,7 +8,8 @@ RUN CGO_ENABLED=0 go build -o /relay .
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata
 COPY --from=build /relay /usr/local/bin/relay
-ENV ADDR=:8080 DATABASE_PATH=/data/farmchore.db
+COPY --from=build /src/web /web
+ENV ADDR=:8080 DATABASE_PATH=/data/farmchore.db WEB_DIR=/web
 VOLUME ["/data"]
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/relay"]
