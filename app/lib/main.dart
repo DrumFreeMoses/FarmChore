@@ -207,7 +207,14 @@ class _WelcomeScreenState extends State<_WelcomeScreen> {
       if (mounted) {
         setState(() => _busy = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Setup failed: $e')),
+          SnackBar(
+            content: Text(
+              'Setup failed: $e',
+              style: const TextStyle(fontSize: 14),
+            ),
+            backgroundColor: FarmColors.error,
+            duration: const Duration(seconds: 10),
+          ),
         );
       }
     }
@@ -255,12 +262,15 @@ class _WelcomeScreenState extends State<_WelcomeScreen> {
               if (widget.error != null) ...[
                 const SizedBox(height: 16),
                 Card(
-                  color: FarmColors.error.withAlpha(25),
+                  color: FarmColors.error,
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Text(
                       widget.error!,
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ),
