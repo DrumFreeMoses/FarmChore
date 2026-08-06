@@ -1,7 +1,7 @@
 // FarmChore Service Worker
 // Handles offline caching and background WebSocket push notifications.
 
-const CACHE_NAME = 'farmchore-v2';
+const CACHE_NAME = 'farmchore-v3';
 const RELAY_CONNECT = 'farmchore-relay-connect';
 const RELAY_EVENT = 'farmchore-relay-event';
 
